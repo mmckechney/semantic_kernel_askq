@@ -105,54 +105,7 @@ namespace Company.Function
 
         }
 
-        //POST https://{your-resource-name}.openai.azure.com/openai/deployments/{deployment-id}/embeddings?api-version={api-version}
-        //https://mmx-france-openai.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2023-07-01-preview
-        //static async Task<string> GenerateEmbeddings(string content, string endpoint, string apiKey, string deployment, ILogger log)
-        //{
-        //    try
-        //    {
-        //        Create the request URL
-        //    string url = endpoint + "/openai/deployments/" + deployment + "/embeddings?api-version=2023-07-01-preview";
-
-        //        Create the request body
-        //    var requestBody = new
-        //    {
-
-        //        input = content
-        //    };
-        //        var requestBodyJson = JsonConvert.SerializeObject(requestBody);
-
-        //        Create the HTTP client and request
-        //    using (var client = new HttpClient())
-        //        using (var request = new HttpRequestMessage())
-        //        {
-        //            Set the request method, headers, and content
-        //            request.Method = HttpMethod.Post;
-        //            request.RequestUri = new Uri(url);
-        //            request.Headers.Add("api-key", apiKey);
-        //            request.Content = new StringContent(requestBodyJson, Encoding.UTF8, "application/json");
-        //            log.LogInformation(requestBodyJson);
-        //            Send the request and get the response
-        //           var response = await client.SendAsync(request);
-        //            var responseJson = await response.Content.ReadAsStringAsync();
-        //            log.LogInformation(responseJson);
-        //            Deserialize the response JSON and return the embeddings
-        //           dynamic responseObj = JsonConvert.DeserializeObject(responseJson);
-
-        //            log.LogInformation({ responseObj});
-        //            log.LogInformation("response string");
-        //            log.LogInformation($"{responseObj.data[0].embedding}");
-        //            return responseObj.data[0].embedding.ToString();
-        //        }
-
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine(ex.Message);
-        //        return "";
-        //    }
-
-        //}
+       
 
     }
 }
