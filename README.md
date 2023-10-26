@@ -1,6 +1,13 @@
 # semantic_kernel_askq
 c# function app - upload docs with rest api, and another functino to process data, and another 2 to ask qs
 
+Permissions:
+1. To leverage Azure OpenAI - this code base not using the Azure OpenAI Key - but rather IAM.  **Enable Managed Identity on the function App** and provide it with Cognitive Services OpenAI User Access.
+
+2. 
+
+
+
 Create an Azure Function: c#, 6 Isolated LTS 
 
 We will have the following functions in our Function App:
