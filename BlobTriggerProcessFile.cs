@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace Company.Function
 {
-    public class trblob_ProcessFile
+    public class BlobTriggerProcessFile
     {
         [FunctionName("BlobTriggerProcessFile")]
         public async Task RunAsync([BlobTrigger("raw/{name}", Connection = "StorageConnectionString")]Stream myBlob, string name, ILogger log)
@@ -31,13 +31,13 @@ namespace Company.Function
 
                 AzureKeyCredential credential = new AzureKeyCredential(subscriptionKey);
                 DocumentAnalysisClient client = new DocumentAnalysisClient(new Uri(endpoint), credential);
-
-               string imgUrl = $"https://{Environment.GetEnvironmentVariable("StorageAccount")}.blob.core.windows.net/raw/{name}";
+                
+               string imgUrl = $"https://{Environment.GetEnvironmentVariable("StorageAccount")}.blob.core.windows.net/raw/{name}"; //?sp=racwdli&st=2023-10-26T17:24:43Z&se=2024-01-02T02:24:43Z&spr=https&sv=2022-11-02&sr=c&sig=2zJpV7Hy47fcYZCZW7pZhxMlp%2FGxY0U1pVE5DEsXL98%3D";
 
                 log.LogInformation(imgUrl);
 
                 Uri fileUri = new Uri(imgUrl);
-
+                
                 AnalyzeDocumentOperation operation = await client.AnalyzeDocumentFromUriAsync(WaitUntil.Completed, "prebuilt-read", fileUri); 
 
                 AnalyzeResult result = operation.Value;
@@ -91,8 +91,8 @@ namespace Company.Function
                          
                     }  
         
-                    log.LogInformation($"JSON file {newName} saved to Azure Blob Storage.");  
-
+                    log.LogInformation($"JSON file {newName} saved to Azure Blob Storage.");
+                    content = "";
                 }
 
             }

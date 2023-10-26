@@ -18,10 +18,10 @@ using System.Linq;
 
 namespace Company.Function
 {
-    public static class httpTriggerAskAboutADoc
+    public static class HttpTriggerAskAboutADoc
     {
         //function you can call to ask a question about a document.
-        [FunctionName("httpTriggerAskAboutADoc")]
+        [FunctionName("HttpTriggerOpenAiSdkAskQuestion")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
