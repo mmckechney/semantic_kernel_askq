@@ -7,7 +7,7 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System.Net.Http;  
+using System.Net.Http;
 using System.Text;
 using Azure;
 using Azure.AI.OpenAI;
@@ -20,57 +20,36 @@ using Microsoft.SemanticKernel.Plugins.Memory;
 using Microsoft.SemanticKernel.Connectors.AI.OpenAI;
 using Microsoft.SemanticKernel.Memory;
 using System.Collections.Generic;
+using Microsoft.SemanticKernel.Connectors.Memory.AzureCognitiveSearch;
 
 namespace Company.Function
 {
+    
     public static class HttpTriggerSemanticKernelAskQuestion
     {
+        private static SemanticMemory semanticMemory;
+        static HttpTriggerSemanticKernelAskQuestion()
+        {
+            semanticMemory = new SemanticMemory();
+        }
+
         //function you can call to ask a question about a document.
         [FunctionName("HttpTriggerSemanticKernelAskQuestion")]
         public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
+            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
+            log.LogInformation("C# HTTP trigger function processed a request for HttpTriggerSemanticKernelAskQuestion.");
 
-            try{
+            semanticMemory.InitMemory();
 
-            
-                string filename = req.Query["filename"];
-                string question = req.Query["question"];
-                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                log.LogInformation(requestBody);
-                dynamic data = JsonConvert.DeserializeObject(requestBody);
-                filename = filename ?? data?.filename;
-                question = question ?? data?.question;
-
-                log.LogInformation("filename = " + filename);
-                log.LogInformation("question = " + question);
-
-                IMemoryStore store;
-                store = new VolatileMemoryStore();
-
-
-                var openAIEndpoint = Environment.GetEnvironmentVariable("OpenAIEndpoint");
-                var chatModel = Environment.GetEnvironmentVariable("OpenAIChatModel");
-                var embeddingModel = Environment.GetEnvironmentVariable("OpenAIEmbeddingModel");
-                var apiKey = Environment.GetEnvironmentVariable("OpenAIKey");
-
-                var memoryWithCustomDb = new MemoryBuilder()
-                    .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
-                    .WithMemoryStore(store)
-                    .Build();
-
-                string nameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
-                var docFile = await GetBlobContentAsync(nameWithoutExtension, log);
-                await MMSemanticMemory.StoreMemoryAsync(memoryWithCustomDb, docFile, log);
-                var memories = await MMSemanticMemory.SearchMemoryAsync(memoryWithCustomDb, question, log);
-
+            try
+            {
+                (string filename, string question) = await Common.GetFilenameAndQuery(req, log);
+                var memories = await semanticMemory.SearchMemoryAsync(filename, question, log);
+                
                 //pass relevant memories to OpenAI - this will reduce the tokens for a prompt.
-                var responseMessage =  await AskOpenAIAsync(filename, question, memories, log);
-
+                var responseMessage =  await AskOpenAIAsync(question, memories, log);
                 return new OkObjectResult(responseMessage);
-
             }
             catch (Exception ex)
             {
@@ -79,38 +58,26 @@ namespace Company.Function
             
             
         }
-        static async Task<string> AskOpenAIAsync(string filename,
-                                                 string prompt, IAsyncEnumerable<MemoryQueryResult> memories, ILogger log)
+        static async Task<string> AskOpenAIAsync(string prompt, IAsyncEnumerable<MemoryQueryResult> memories, ILogger log)
         {
             log.LogInformation("Ask OpenAI Async A Question");
-            var openAIEndpoint = Environment.GetEnvironmentVariable("OpenAIEndpoint");
-            var chatModel = Environment.GetEnvironmentVariable("OpenAIChatModel");
-
-            var client = new OpenAIClient(new Uri(openAIEndpoint), new DefaultAzureCredential());
-          
-            log.LogInformation("Ask OpenAI Async A Question 2");
-            //remove extension from file name if it is there.
+            
             
             var content = "";
+            var docName = "";
             await foreach (MemoryQueryResult memoryResult in memories)
             {
-                log.LogInformation("Ask OpenAI Async A Question 3");
                 log.LogInformation("Memory Result = " + memoryResult.Metadata.Description);
+                if(docName != memoryResult.Metadata.Id.Substring(0, memoryResult.Metadata.Id.LastIndexOf('_')))
+                {
+                    docName = memoryResult.Metadata.Id.Substring(0, memoryResult.Metadata.Id.LastIndexOf('_'));
+                    content += $"\nDocument Name: {docName}\n";
+                }
                 content += memoryResult.Metadata.Description;
             };
 
-            var chatCompletionsOptions = new ChatCompletionsOptions()
-            {
-                Messages =
-                  {
-                      new ChatMessage(ChatRole.System, @"You are a document answering bot.  You will be provided with information from a document, and you are to answer the question based on the content provided.  Your are not to make up answers. Use the content provided to answer the question."),
-                      new ChatMessage(ChatRole.User, @"Document = " + content),
-                      new ChatMessage(ChatRole.User, @"Question = " + prompt),
-                  },
-            };
-
-
-            var completionsResponse = await client.GetChatCompletionsAsync(chatModel, chatCompletionsOptions);
+            var chatCompletionsOptions = Common.GetChatCompletionsOptions(content, prompt);
+            var completionsResponse = await Common.Client.GetChatCompletionsAsync(Common.ChatModel, chatCompletionsOptions);
             string completion = completionsResponse.Value.Choices[0].Message.Content;
 
             return completion;
@@ -153,55 +120,6 @@ namespace Company.Function
             }
             return docFile;
         }
-}
-
-public static class MMSemanticMemory
-{
-    private const string MemoryCollectionName = "mmSemanticMemory";
-
-    const string memoryCollectionName = "aboutADoc";
-
-    public static async Task StoreMemoryAsync(ISemanticTextMemory  memory, Dictionary<string, string> docFile, ILogger log)
-    {
-        log.LogInformation("Storing memory...");
-        var i = 0;
-        foreach (var entry in docFile)
-        {
-            await memory.SaveReferenceAsync(
-                collection: MemoryCollectionName,
-                externalSourceName: "BlobStorage",
-                externalId: entry.Key,
-                description: entry.Value,
-                text: entry.Value);
-
-            log.LogInformation($" #{++i} saved.");
-        }
-
-        log.LogInformation("\n----------------------");
-
-
-    }
-    public static async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(ISemanticTextMemory memory, string query, ILogger log)
-    {
-        log.LogInformation("\nQuery: " + query + "\n");
-
-        var memoryResults = memory.SearchAsync(MemoryCollectionName, query, limit: 2, minRelevanceScore: 0.5);
-
-        int i = 0;
-        await foreach (MemoryQueryResult memoryResult in memoryResults)
-        {
-            log.LogInformation($"Result {++i}:");
-            log.LogInformation("  URL:     : " + memoryResult.Metadata.Id);
-            log.LogInformation("  Text    : " + memoryResult.Metadata.Description);
-            log.LogInformation("  Relevance: " + memoryResult.Relevance);
-            
-
-        }
-
-        log.LogInformation("----------------------");
-
-        return memoryResults;
-    }
 }
 }
 

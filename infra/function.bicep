@@ -7,6 +7,7 @@ param rawBlobContainerName string
 param extractedBlobContainerName string
 param openAIChatModel string = 'gpt-4-32k'
 param openAIEmbeddingModel string = 'text-embedding-ada-002'
+param cognitiveSearchName string
 param location string = resourceGroup().location
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
@@ -15,6 +16,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing 
 
 resource cognitiveServicesAccount 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
   name: cognitiveServicesAccountName
+}
+
+resource cognitiveSearchInstance 'Microsoft.Search/searchServices@2022-09-01' existing = {
+  name: cognitiveSearchName
 }
 var storageAccountConnection = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
 
@@ -122,6 +127,14 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
           value: 'dotnet'
+        }
+        {
+            name: 'CognitiveSearchEndpoint'
+            value: 'https://${cognitiveSearchName}.search.windows.net'
+        }
+        {
+            name: 'CognitiveSearchAdminKey'
+            value: cognitiveSearchInstance.listAdminKeys().primaryKey
         }
       ]
     }

@@ -7,6 +7,7 @@ param resourceGroupName string
 param functionAppName string
 param storageAccountName string
 param cognitiveServicesAccountName string
+param cognitiveSearchName string
 param openAiEndpoint string
 param openAiKey string
 param openAIChatModel string = 'gpt-4'
@@ -18,6 +19,18 @@ resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   location: location
 }
 
+
+module cognitiveSearch 'cognitivesearch.bicep' = {
+  name: 'cognitiveSearch'
+  scope: resourceGroup(resourceGroupName)
+  params: {
+    cognitiveSearchName: cognitiveSearchName
+    location: location
+  }
+  dependsOn: [
+    rg
+  ]
+}
 module cognitiveServices 'cognitiveservices.bicep' = {
   name: 'cognitiveServices'
   scope: resourceGroup(resourceGroupName)
@@ -55,11 +68,13 @@ module functionResources 'function.bicep' = {
     storageAccountName: storageAccountName
     extractedBlobContainerName: storageResources.outputs.extractedContainerName
     rawBlobContainerName: storageResources.outputs.rawContainerName
-  }
+    cognitiveSearchName: cognitiveSearchName
+}
   dependsOn: [
     rg
     storageResources
     cognitiveServices
+    cognitiveSearch
   ]
 }
 

@@ -21,74 +21,42 @@ namespace Company.Function
 {
     public static class HttpTriggerAskAboutADoc
     {
+
+
         //function you can call to ask a question about a document.
         [FunctionName("HttpTriggerOpenAiSdkAskQuestion")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
+            log.LogInformation("C# HTTP trigger function processed a request for HttpTriggerOpenAiSdkAskQuestion.");
 
-            try{
-
-            
-                string filename = req.Query["filename"];
-                string question = req.Query["question"];
-                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                log.LogInformation(requestBody);
-                dynamic data = JsonConvert.DeserializeObject(requestBody);
-                filename = filename ?? data?.filename;
-                question = question ?? data?.question;
-
-                log.LogInformation("filename = " + filename);
-                log.LogInformation("question = " + question);
-                string nameWithoutExtension = Path.GetFileNameWithoutExtension(filename); 
-
-                var responseMessage =  await AskOpenAIAsync(nameWithoutExtension, question, log);
-
+            try
+            {
+                (string filename, string question) = await Common.GetFilenameAndQuery(req, log);
+                var responseMessage = await AskOpenAIAsync(filename, question, log);
 
                 return new OkObjectResult(responseMessage);
-
-                
             }
             catch (Exception ex)
             {
-                return new OkObjectResult(ex.Message);
+                return new BadRequestObjectResult(ex.Message);
             }
-            
-            
+
+
         }
         static async Task<string> AskOpenAIAsync(string filename, string prompt, ILogger log)
         {
             log.LogInformation("Ask OpenAI Async A Question");
-            var openAIEndpoint = Environment.GetEnvironmentVariable("OpenAIEndpoint");
-            var chatModel = Environment.GetEnvironmentVariable("OpenAIChatModel");
 
-            var client = new OpenAIClient(new Uri(openAIEndpoint), new DefaultAzureCredential());
-          
+            var content = await GetBlobContentAsync(filename, log);
 
-            log.LogInformation("Ask OpenAI Async A Question 2");
-            var content =  await GetBlobContentAsync(filename, log);
-
-            //log.LogInformation(content);
-
-            var chatCompletionsOptions = new ChatCompletionsOptions()
-            {
-                Messages =
-                  {
-                      new ChatMessage(ChatRole.System, @"You are a document answering bot.  You will be provided with information from a document, and you are to answer the question based on the content provided.  Your are not to make up answers. Use the content provided to answer the question."),
-                      new ChatMessage(ChatRole.User, @"Content = " + content),
-                      new ChatMessage(ChatRole.User, @"Question = " + prompt),
-                  },
-            };
-
-
-            var completionsResponse = await client.GetChatCompletionsAsync(chatModel, chatCompletionsOptions);
+            var chatCompletionsOptions = Common.GetChatCompletionsOptions(content, prompt);
+            var completionsResponse = await Common.Client.GetChatCompletionsAsync(Common.ChatModel, chatCompletionsOptions);
             string completion = completionsResponse.Value.Choices[0].Message.Content;
 
             return completion;
         }
-
 
         public static async Task<string> GetBlobContentAsync(string blobName, ILogger log)
         {
@@ -125,6 +93,6 @@ namespace Company.Function
             }
             return content;
         }
-}
+    }
 }
 
