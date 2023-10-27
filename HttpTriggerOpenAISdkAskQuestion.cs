@@ -15,6 +15,7 @@ using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using System.Linq;
+using Company.Function.Models;
 
 namespace Company.Function
 {
@@ -114,8 +115,10 @@ namespace Company.Function
                 {
                     using (StreamReader reader = new StreamReader(stream))
                     {
-                        content += await reader.ReadToEndAsync();
-                        
+                        var processedFile = JsonConvert.DeserializeObject<ProcessedFile>(await reader.ReadToEndAsync());
+                        content += processedFile.Content;
+
+
                     }
                 }
 

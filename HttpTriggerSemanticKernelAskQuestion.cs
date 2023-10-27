@@ -56,11 +56,6 @@ namespace Company.Function
                 var embeddingModel = Environment.GetEnvironmentVariable("OpenAIEmbeddingModel");
                 var apiKey = Environment.GetEnvironmentVariable("OpenAIKey");
 
-                // var kernel = Kernel.Builder
-                //     .WithAzureChatCompletionService(chatModel, openAIEndpoint, apiKey)
-                //     .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
-                //     .Build();
-
                 var memoryWithCustomDb = new MemoryBuilder()
                     .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
                     .WithMemoryStore(store)
