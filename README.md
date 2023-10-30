@@ -1,5 +1,6 @@
 # Semantic Kernel and Azure OpenAI: Ask Questions on your document
 
+
 ## Overview
 
 This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) and [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) to ask question specific to that document.
@@ -44,6 +45,14 @@ If successful, this process will create:
   - Role assigment for Cognitive Services identity for read access to `raw` container and write access to `extracted` container
 
 ### Running Samples
+=======
+Permissions:
+1. To leverage Azure OpenAI - this code base not using the Azure OpenAI Key - but rather IAM.  **Enable Managed Identity on the function App** and provide it with Cognitive Services OpenAI User Access.
+
+2. 
+
+Create an Azure Function: c#, 6 Isolated LTS 
+
 
 We will have the following functions in our Function App:
 
