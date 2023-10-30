@@ -64,13 +64,6 @@ Once the file us uploaded, the `BlobTriggerProcessFile` will automatically trigg
 
    Question:
 
-      ``` json
-      {
-      "filename": "decind.pdf",
-      "question": "How many people signed this document"
-      }
-      ```
-
       Return:
 
       ``` text
@@ -95,4 +88,3 @@ Once the file us uploaded, the `BlobTriggerProcessFile` will automatically trigg
 
 ### What's next?
 
-Try uploading your own documents and start asking questions!
