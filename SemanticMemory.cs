@@ -17,11 +17,14 @@ namespace DocumentQuestions.Function
         ILogger<SemanticMemory> log;
         IConfiguration config;
         ILoggerFactory logFactory;
-        public SemanticMemory(ILoggerFactory logFactory, IConfiguration config)
+        bool usingVolatileMemory = false;
+        Common common;
+        public SemanticMemory(ILoggerFactory logFactory, IConfiguration config, Common common)
         {
             log = logFactory.CreateLogger<SemanticMemory>();
             this.config = config;
             this.logFactory = logFactory;
+            this.common = common;
         }
 
 
@@ -31,11 +34,21 @@ namespace DocumentQuestions.Function
             var openAIEndpoint = config["OpenAIEndpoint"] ?? throw new ArgumentException("Missing OpenAIEndpoint in configuration.");
             var embeddingModel = config["OpenAIEmbeddingModel"] ?? throw new ArgumentException("Missing OpenAIEmbeddingModel in configuration.");
             var apiKey = config["OpenAIKey"] ?? throw new ArgumentException("Missing OpenAIKey in configuration.");
-            var cogSearchEndpoint = config["CognitiveSearchEndpoint"] ?? throw new ArgumentException("Missing CognitiveSearchEndpoint in configuration.");
-            var cogSearchAdminKey = config["CognitiveSearchAdminKey"] ?? throw new ArgumentException("Missing CognitiveSearchAdminKey in configuration.");
+            var cogSearchEndpoint = config["CognitiveSearchEndpoint"] ?? "";
+            var cogSearchAdminKey = config["CognitiveSearchAdminKey"] ?? "";
 
             IMemoryStore store;
-            store = new AzureCognitiveSearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
+            if(string.IsNullOrWhiteSpace(cogSearchEndpoint) && string.IsNullOrWhiteSpace(cogSearchAdminKey))
+            {
+                log.LogInformation("Cognitive Search not configured. Using in-memory store.");
+                store = new VolatileMemoryStore();
+                usingVolatileMemory = true;
+            }
+            else
+            {
+                store = new AzureCognitiveSearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
+            }
+           
 
             semanticMemory = new MemoryBuilder()
                 .WithLoggerFactory(logFactory)
@@ -44,7 +57,7 @@ namespace DocumentQuestions.Function
                 .Build();
         }
 
-        public async Task StoreMemoryAsync(string collectionName, Dictionary<string, string> docFile, ILogger log)
+        public async Task StoreMemoryAsync(string collectionName, Dictionary<string, string> docFile)
         {
             log.LogInformation("Storing memory...");
             var i = 0;
@@ -66,6 +79,13 @@ namespace DocumentQuestions.Function
         }
         public async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(string collectionName, string query)
         {
+            //If using Volatile Memory, first need to re-populate memory from Blob storage
+            if(usingVolatileMemory)
+            {
+                var docFile = await common.GetBlobContentDictionaryAsync(collectionName);
+                await StoreMemoryAsync(collectionName, docFile);
+            }
+
             log.LogInformation("\nQuery: " + query + "\n");
 
             var memoryResults = semanticMemory.SearchAsync(collectionName, query, limit: 30, minRelevanceScore: 0.5, withEmbeddings: true);

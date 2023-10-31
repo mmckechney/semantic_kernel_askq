@@ -111,8 +111,8 @@ namespace DocumentQuestions.Function
                     taskList.Add(WriteAnalysisContentToBlob(name, counter, content, log));
                     docContent.Add(GetFileName(name, counter), content);
                 }
-                taskList.Add(semanticMemory.StoreMemoryAsync(memoryCollectionName, docContent, log));
-                taskList.Add(semanticMemory.StoreMemoryAsync("general", docContent, log));
+                taskList.Add(semanticMemory.StoreMemoryAsync(memoryCollectionName, docContent));
+                taskList.Add(semanticMemory.StoreMemoryAsync("general", docContent));
 
                 Task.WaitAll(taskList.ToArray());
             }

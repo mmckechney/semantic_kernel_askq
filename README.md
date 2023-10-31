@@ -42,8 +42,13 @@ If successful, this process will create:
   - Role assigment for the function identity to access blob storage and call Azure OpenAI
 - Azure Cognitive Services account with system assigned managed identity
   - Role assigment for Cognitive Services identity for read access to `raw` container and write access to `extracted` container
+- Azure Cogitive Search account (optional with `-useCognitiveSeach` parameter)
+  
 
 ### Running Samples
+
+If you have deployed the solution with the `-useCognitiveSeach` parameter, the `BlobTriggerProcessFile` will not only process the document and put the results into the `extracted` blob container, it will also put those results into the [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) index. Then, when using the `HttpTriggerSemanticKernelAskQuestion` method, it will use the Semantic Kernel AzureCognitiveSearchMemoryStore to search to search for documents and ask questions.\
+If you do not deploy the solution with the `-useCognitiveSeach` parameter, the `HttpTriggerSemanticKernelAskQuestion` will use a combination of the `extracted` blob container and Semantic Kernel VolatileMemoryStore to search for documents and ask questions.
 
 We will have the following functions in our Function App:
 

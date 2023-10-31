@@ -15,7 +15,6 @@ namespace DocumentQuestions.Function
 {
     public class AzureOpenAiService
     {
-        private SemanticMemory semanticMemory;
         ILogger<HttpTriggerAskAboutADoc> log;
         IConfiguration config;
         Common common;
@@ -24,7 +23,6 @@ namespace DocumentQuestions.Function
             this.log = log;
             this.config = config;
             this.common = common;
-            this.semanticMemory = semanticMemory;
         }
 
         private OpenAIClient _client = null;

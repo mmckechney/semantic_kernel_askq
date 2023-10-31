@@ -2,7 +2,8 @@ param(
 	[string] $functionAppName,
     [string] $location,
     [string] $openAiEndpoint,
-    [string] $openAiKey
+    [string] $openAiKey,
+    [bool]   $useCognitiveSearch =$true
 )
 
 $error.Clear()
@@ -24,7 +25,7 @@ Write-Host "Cognitive Search Account Name: $cognitiveSearchName" -ForegroundColo
 
 Write-Host "Open AI Endpoint: $openAiEndpoint" -ForegroundColor Green
 
-az deployment sub create --location $location  --template-file ./infra/main.bicep --parameters resourceGroupName=$resourceGroupName location=$location functionAppName=$functionAppName storageAccountName=$storageAccountName cognitiveServicesAccountName=$cognitiveServicesAccountName cognitiveSearchName=$cognitiveSearchName openAiEndpoint=$openAiEndpoint openAiKey=$openAiKey keyVaultName=$keyVaultName -o table
+az deployment sub create --location $location  --template-file ./infra/main.bicep --parameters resourceGroupName=$resourceGroupName location=$location functionAppName=$functionAppName storageAccountName=$storageAccountName cognitiveServicesAccountName=$cognitiveServicesAccountName cognitiveSearchName=$cognitiveSearchName openAiEndpoint=$openAiEndpoint openAiKey=$openAiKey keyVaultName=$keyVaultName  useCognitiveSearch=$useCognitiveSearch -o table
 
 if(!$?){ exit }
 

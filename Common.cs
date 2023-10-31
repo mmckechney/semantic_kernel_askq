@@ -12,7 +12,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Linq;
-
+using System.Collections.Generic;
 
 namespace DocumentQuestions.Function
 {
@@ -86,6 +86,43 @@ namespace DocumentQuestions.Function
 
             }
             return content;
+        }
+
+        public async Task<Dictionary<string, string>> GetBlobContentDictionaryAsync(string blobName)
+        {
+            string connectionString = Environment.GetEnvironmentVariable("StorageConnectionString") ?? "DefaultConnection";
+            string containerName = Environment.GetEnvironmentVariable("ExtractedContainerName") ?? "DefaultContainer";
+
+
+
+            BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+            BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+            var blobs = containerClient.GetBlobs(prefix: blobName);
+            log.LogInformation($"Number of blobs {blobs.Count()}");
+
+            var content = "";
+            Dictionary<string, string> docFile = new();
+
+            foreach (var blob in blobs)
+            {
+
+                blobName = blob.Name;
+
+                BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+                // Open the blob and read its contents.  
+                using (Stream stream = await blobClient.OpenReadAsync())
+                {
+                    using (StreamReader reader = new StreamReader(stream))
+                    {
+                        content += await reader.ReadToEndAsync();
+                        docFile.Add(blob.Name, content);
+                    }
+                }
+
+            }
+            return docFile;
         }
     }
 }

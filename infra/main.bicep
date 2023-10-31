@@ -13,6 +13,7 @@ param openAiEndpoint string
 param openAiKey string
 param openAIChatModel string = 'gpt-4'
 param openAIEmbeddingModel string = 'text-embedding-ada-002'
+param useCognitiveSearch bool = true
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
     name: resourceGroupName
@@ -34,7 +35,7 @@ module keyVault 'keyvault.bicep' = {
     ]
 }
 
-module cognitiveSearch 'cognitivesearch.bicep' = {
+module cognitiveSearch 'cognitivesearch.bicep' = if(useCognitiveSearch) {
     name: 'cognitiveSearch'
     scope: resourceGroup(resourceGroupName)
     params: {
