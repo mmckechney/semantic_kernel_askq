@@ -15,13 +15,14 @@ using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using System.Linq;
+using Company.Function.Models;
 
 namespace Company.Function
 {
-    public static class httpTriggerAskAboutADoc
+    public static class HttpTriggerAskAboutADoc
     {
         //function you can call to ask a question about a document.
-        [FunctionName("httpTriggerAskAboutADoc")]
+        [FunctionName("HttpTriggerOpenAiSdkAskQuestion")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
@@ -114,8 +115,10 @@ namespace Company.Function
                 {
                     using (StreamReader reader = new StreamReader(stream))
                     {
-                        content += await reader.ReadToEndAsync();
-                        
+                        var processedFile = JsonConvert.DeserializeObject<ProcessedFile>(await reader.ReadToEndAsync());
+                        content += processedFile.Content;
+
+
                     }
                 }
 

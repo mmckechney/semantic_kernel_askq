@@ -13,7 +13,7 @@ using Azure.Storage.Blobs;
 
 namespace Company.Function
 {
-    public static class trUploadFile
+    public static class HttpTriggerUploadFile
     {
         [FunctionName("HttpTriggerUploadFile")]
         public static async Task<IActionResult> Run(

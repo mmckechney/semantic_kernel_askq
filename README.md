@@ -1,5 +1,6 @@
 # Semantic Kernel and Azure OpenAI: Ask Questions on your document
 
+
 ## Overview
 
 This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) and [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) to ask question specific to that document.
@@ -50,9 +51,8 @@ Permissions:
 
 2. 
 
-
-
 Create an Azure Function: c#, 6 Isolated LTS 
+
 
 We will have the following functions in our Function App:
 
@@ -63,13 +63,6 @@ Once the file us uploaded, the `BlobTriggerProcessFile` will automatically trigg
 2. Ask questions using the `HttpTriggerSemanticKernelAskQuestion` and/or `HttpTriggerOpenAiSdkAskQuestion` function - this uses semantic config to only load max of 2 pages to reduce tokens provided to Azure OpenAI.
 
    Question:
-
-      ``` json
-      {
-      "filename": "decind.pdf",
-      "question": "How many people signed this document"
-      }
-      ```
 
       Return:
 
@@ -95,4 +88,3 @@ Once the file us uploaded, the `BlobTriggerProcessFile` will automatically trigg
 
 ### What's next?
 
-Try uploading your own documents and start asking questions!

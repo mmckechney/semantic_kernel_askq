@@ -23,10 +23,10 @@ using System.Collections.Generic;
 
 namespace Company.Function
 {
-    public static class httpTriggerSemanticConfigAskQuestion
+    public static class HttpTriggerSemanticKernelAskQuestion
     {
         //function you can call to ask a question about a document.
-        [FunctionName("httpTriggerSemanticConfigAskQuestion")]
+        [FunctionName("HttpTriggerSemanticKernelAskQuestion")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
@@ -56,19 +56,13 @@ namespace Company.Function
                 var embeddingModel = Environment.GetEnvironmentVariable("OpenAIEmbeddingModel");
                 var apiKey = Environment.GetEnvironmentVariable("OpenAIKey");
 
-                var kernel = Kernel.Builder
-                    .WithAzureChatCompletionService(chatModel, openAIEndpoint, apiKey)
+                var memoryWithCustomDb = new MemoryBuilder()
                     .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
+                    .WithMemoryStore(store)
                     .Build();
 
-                var memoryWithCustomDb = new MemoryBuilder()
-                .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
-                        .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
-                        .WithMemoryStore(store)
-                        .Build();
-
-                string nameWithoutExtension = Path.GetFileNameWithoutExtension(filename); 
-                var docFile =  await GetBlobContentAsync(nameWithoutExtension, log);
+                string nameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
+                var docFile = await GetBlobContentAsync(nameWithoutExtension, log);
                 await MMSemanticMemory.StoreMemoryAsync(memoryWithCustomDb, docFile, log);
                 var memories = await MMSemanticMemory.SearchMemoryAsync(memoryWithCustomDb, question, log);
 

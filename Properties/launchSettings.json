@@ -1,9 +1,22 @@
 {
   "profiles": {
-    "chr_olderFunction": {
+    "docquestions": {
       "commandName": "Project",
       "commandLineArgs": "--port 7018",
-      "launchBrowser": false
+      "environmentVariables": {
+        "OpenAIEndpoint": "",
+        "OpenAIKey": "",
+        "OpenAIChatModel": "gpt-4-32k",
+        "OpenAIEmbeddingModel": "text-embedding-ada-002",
+        "StorageAccount": "",
+        "StorageConnectionString": "",
+        "ExtractedContainerName": "extracted",
+        "ContainerName": "raw",
+        "RawStorageConnectionString": "",
+        "DocumentIntelligenceSubscriptionKey": "",
+        "DocumentIntelligenceEndpoint": ""
+      },
+      "nativeDebugging": false
     }
   }
 }
