@@ -1,26 +1,17 @@
 param functionAppName string
 param storageAccountName string
-param cognitiveServicesAccountName string
-param openAiEndpoint string
-param openAiKey string
+param keyVaultName string
 param rawBlobContainerName string
 param extractedBlobContainerName string
 param openAIChatModel string = 'gpt-4-32k'
 param openAIEmbeddingModel string = 'text-embedding-ada-002'
-param cognitiveSearchName string
 param location string = resourceGroup().location
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: storageAccountName
 }
 
-resource cognitiveServicesAccount 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
-  name: cognitiveServicesAccountName
-}
 
-resource cognitiveSearchInstance 'Microsoft.Search/searchServices@2022-09-01' existing = {
-  name: cognitiveSearchName
-}
 var storageAccountConnection = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
 
 
@@ -68,17 +59,17 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
           value: storageAccountConnection
         }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: functionAppName
-        }
+        // {
+        //   name: 'WEBSITE_CONTENTSHARE'
+        //   value: functionAppName
+        // }
         {
           name: 'DocumentIntelligenceSubscriptionKey'
-          value: cognitiveServicesAccount.listKeys().key1
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=DocumentIntelligenceSubscriptionKey)'
         }
         {
           name: 'DocumentIntelligenceEndpoint'
-          value: cognitiveServicesAccount.properties.endpoint
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=DocumentIntelligenceEndpoint)'
         }
         {
           name: 'ContainerName'
@@ -98,19 +89,19 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         }
         {
           name: 'OpenAIKey'
-          value: openAiKey
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=OpenAIKey)'
         }
         {
           name: 'OpenAIEndpoint'
-          value: openAiEndpoint
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=OpenAIEndpoint)'
         }
         {
           name : 'RawStorageConnectionString'
-          value: storageAccountConnection
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=RawStorageConnectionString)'
         } 
         {
           name : 'StorageConnectionString'
-          value: storageAccountConnection
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=StorageConnectionString)'
         }
         {
           name: 'StorageAccount'
@@ -130,11 +121,11 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         }
         {
             name: 'CognitiveSearchEndpoint'
-            value: 'https://${cognitiveSearchName}.search.windows.net'
+            value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchEndpoint)'
         }
         {
             name: 'CognitiveSearchAdminKey'
-            value: cognitiveSearchInstance.listAdminKeys().primaryKey
+            value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchAdminKey)'
         }
       ]
     }

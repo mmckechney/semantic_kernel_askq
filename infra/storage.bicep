@@ -1,6 +1,7 @@
 
 param storageAccountName string 
 param location string  = resourceGroup().location
+param keyVaultName string
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
   name: storageAccountName
   location: location
@@ -28,6 +29,26 @@ resource extractedBlobContainer 'Microsoft.Storage/storageAccounts/blobServices/
   name: 'extracted'
   properties: {
     publicAccess: 'None'
+  }
+}
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
+  name: keyVaultName
+}
+
+resource rawConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
+  parent: keyVault
+  name: 'RawStorageConnectionString'
+  properties: {
+    value:  'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+  }
+}
+
+resource mainConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
+  parent: keyVault
+  name: 'StorageConnectionString'
+  properties: {
+    value:  'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
   }
 }
 

@@ -27,12 +27,22 @@ resource extractedBlobContainer 'Microsoft.Storage/storageAccounts/blobServices/
 
 var storageBlobDataContrib = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageBlobDataReader = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+var keyVaultSecretsUser = '4633458b-17de-408a-b874-0445c86b69e6'
 
 resource func_blob_contrib_role 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(functionAppName, storageBlobDataContrib, resourceGroup().id)
   scope: blobService
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContrib)
+    principalId: functionPrincipalId
+  }
+}
+
+resource keyvault_secret_user 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(functionAppName, keyVaultSecretsUser, resourceGroup().id)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUser)
     principalId: functionPrincipalId
   }
 }
@@ -55,3 +65,6 @@ resource cogsvc_blob_reader_role 'Microsoft.Authorization/roleAssignments@2022-0
     principalId: cogSvcsPrincipalId
   }
 }
+
+
+
