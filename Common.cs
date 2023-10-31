@@ -1,78 +1,32 @@
 ﻿using Azure;
 using Azure.AI.OpenAI;
 using Azure.Identity;
+using Azure.Storage.Blobs;
+using DocumentQuestions.Function.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
-namespace Company.Function
+
+namespace DocumentQuestions.Function
 {
-    static class Common
+    public class Common
     {
-        private static OpenAIClient _client = null;
-        public static OpenAIClient Client
+        ILogger<Common> log;
+        IConfiguration config;
+        public Common(ILogger<Common> log, IConfiguration config)
         {
-            get
-            {
-                if (_client == null)
-                {
-                    var openAIEndpoint = Environment.GetEnvironmentVariable("OpenAIEndpoint");
-                    var openAIKey = "";
-                    bool useOpenAIKey = false;
-                    try
-                    {
-                        openAIKey = Environment.GetEnvironmentVariable("OpenAIKey");
-                        bool.TryParse(Environment.GetEnvironmentVariable("UseOpenAIKey"), out useOpenAIKey);
-                    }
-                    catch { }
-
-                    if (useOpenAIKey && !string.IsNullOrWhiteSpace(openAIKey))
-                    {
-                       _client = new OpenAIClient(new Uri(openAIEndpoint), new AzureKeyCredential(openAIKey));
-                    }
-                    else
-                    {
-                        _client = new OpenAIClient(new Uri(openAIEndpoint), new DefaultAzureCredential());
-                    }
-                }
-                return _client;
-
-            }
-
+            this.log = log;
+            this.config = config;
         }
-
-        private static string chatModel = Environment.GetEnvironmentVariable("OpenAIChatModel");
-        public static string ChatModel
-        {
-            get
-            {
-                return chatModel;
-            }
-        }
-
-
-        public static ChatCompletionsOptions GetChatCompletionsOptions(string content, string prompt)
-        {
-            var opts = new ChatCompletionsOptions()
-            {
-                Messages =
-                  {
-                      new ChatMessage(ChatRole.System, @"You are a document answering bot.  You will be provided with information from a document, and you are to answer the question based on the content provided.  Your are not to make up answers. Use the content provided to answer the question."),
-                      new ChatMessage(ChatRole.User, @"Content = " + content),
-                      new ChatMessage(ChatRole.User, @"Question = " + prompt),
-                  },
-            };
-
-            return opts;
-        }
-
-        public static async Task<(string filename, string question)>GetFilenameAndQuery(HttpRequest req, ILogger log)
+        
+        public async Task<(string filename, string question)> GetFilenameAndQuery(HttpRequestData req)
         {
             string filename = req.Query["filename"];
             string question = req.Query["question"];
@@ -96,6 +50,42 @@ namespace Company.Function
             log.LogInformation("question = " + question);
 
             return (filename, question);
+        }
+
+        public async Task<string> GetBlobContentAsync(string blobName)
+        {
+            string connectionString = config["StorageConnectionString"] ?? throw new ArgumentException("Missing StorageConnectionString in configuration.");
+            string containerName = config["ExtractedContainerName"] ?? throw new ArgumentException("Missing ExtractedContainerName in configuration.");
+
+
+
+            BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+            BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+            var blobs = containerClient.GetBlobs(prefix: blobName);
+            log.LogInformation($"Number of blobs {blobs.Count()}");
+
+            var content = "";
+            foreach (var blob in blobs)
+            {
+                blobName = blob.Name;
+
+                BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+                // Open the blob and read its contents.  
+                using (Stream stream = await blobClient.OpenReadAsync())
+                {
+                    using (StreamReader reader = new StreamReader(stream))
+                    {
+                        var processedFile = JsonConvert.DeserializeObject<ProcessedFile>(await reader.ReadToEndAsync());
+                        content += processedFile.Content;
+
+
+                    }
+                }
+
+            }
+            return content;
         }
     }
 }
