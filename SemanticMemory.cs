@@ -1,38 +1,44 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel.Connectors.Memory.AzureCognitiveSearch;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Connectors.AI.OpenAI;
+using Microsoft.SemanticKernel.Connectors.Memory.AzureCognitiveSearch;
+using Microsoft.SemanticKernel.Memory;
+using Microsoft.SemanticKernel.Plugins.Memory;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.SemanticKernel.Plugins.Memory;
-using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Connectors.AI.OpenAI;
 
-namespace Company.Function
+namespace DocumentQuestions.Function
 {
-    internal class SemanticMemory
+    public class SemanticMemory
     {
         ISemanticTextMemory semanticMemory;
-        public SemanticMemory()
+        ILogger<SemanticMemory> log;
+        IConfiguration config;
+        ILoggerFactory logFactory;
+        public SemanticMemory(ILoggerFactory logFactory, IConfiguration config)
         {
+            log = logFactory.CreateLogger<SemanticMemory>();
+            this.config = config;
+            this.logFactory = logFactory;
         }
+
 
         public void InitMemory()
         {
 
-            var openAIEndpoint = Environment.GetEnvironmentVariable("OpenAIEndpoint");
-            var embeddingModel = Environment.GetEnvironmentVariable("OpenAIEmbeddingModel");
-            var apiKey = Environment.GetEnvironmentVariable("OpenAIKey");
-            var cogSearchEndpoint = Environment.GetEnvironmentVariable("CognitiveSearchEndpoint");
-            var cogSearchAdminKey = Environment.GetEnvironmentVariable("CognitiveSearchAdminKey");
+            var openAIEndpoint = config["OpenAIEndpoint"] ?? throw new ArgumentException("Missing OpenAIEndpoint in configuration.");
+            var embeddingModel = config["OpenAIEmbeddingModel"] ?? throw new ArgumentException("Missing OpenAIEmbeddingModel in configuration.");
+            var apiKey = config["OpenAIKey"] ?? throw new ArgumentException("Missing OpenAIKey in configuration.");
+            var cogSearchEndpoint = config["CognitiveSearchEndpoint"] ?? throw new ArgumentException("Missing CognitiveSearchEndpoint in configuration.");
+            var cogSearchAdminKey = config["CognitiveSearchAdminKey"] ?? throw new ArgumentException("Missing CognitiveSearchAdminKey in configuration.");
 
             IMemoryStore store;
             store = new AzureCognitiveSearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
 
             semanticMemory = new MemoryBuilder()
-                //.WithLoggerFactory(logFactory)
+                .WithLoggerFactory(logFactory)
                 .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
                 .WithMemoryStore(store)
                 .Build();
@@ -58,7 +64,7 @@ namespace Company.Function
 
 
         }
-        public async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(string collectionName, string query, ILogger log)
+        public async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(string collectionName, string query)
         {
             log.LogInformation("\nQuery: " + query + "\n");
 

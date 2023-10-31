@@ -1,48 +1,68 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Azure.Core;
+using Azure.Storage.Blobs;
+using HttpMultipartParser;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Azure.Storage.Blobs;
+using System;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using System.Linq;
+using Microsoft.Extensions.Configuration;
 
 //function to upload document into blob storage.
 
-namespace Company.Function
+namespace DocumentQuestions.Function
 {
-    public static class HttpTriggerUploadFile
+    public class HttpTriggerUploadFile
     {
-        [FunctionName("HttpTriggerUploadFile")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
+        ILogger<HttpTriggerAskAboutADoc> log;
+        IConfiguration config;
+        public HttpTriggerUploadFile(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config)
+        {
+            this.log = log;
+            this.config = config;
+        }
+        [Function("HttpTriggerUploadFile")]
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req)
         {
             try
             {
-                string connectionString = Environment.GetEnvironmentVariable("RawStorageConnectionString") ?? "DefaultConnection";
-                string containerName = Environment.GetEnvironmentVariable("ContainerName") ?? "DefaultContainer";
+                string connectionString = config["RawStorageConnectionString"] ?? throw new ArgumentException("Missing RawStorageConnectionString in configuration.");
+                string containerName = config["ContainerName"] ?? throw new ArgumentException("Missing ContainerName in configuration.");
                 var serviceClient = new BlobServiceClient(connectionString);
                 var containerClient = serviceClient.GetBlobContainerClient(containerName);
+                var multipart = await MultipartFormDataParser.ParseAsync(req.Body);
 
-                var formData = await req.ReadFormAsync();
-                var file = req.Form.Files["file"];
+                if(multipart.Files.First() == null)
+                {
+                    var badResp = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                    badResp.Body = new MemoryStream(Encoding.UTF8.GetBytes("Missing File Data"));
+                    return badResp;
 
-                Stream myBlob = new MemoryStream();
-                myBlob = file.OpenReadStream();
-               
+                }
+                var fileContent = multipart.Files.First().Data;
+                var fileName = multipart.Files.First().FileName;
+
                 var blobClient = new BlobContainerClient(connectionString, containerName);
-                var blob = blobClient.GetBlobClient(file.FileName);
-                await blob.UploadAsync(myBlob);
+                var blob = blobClient.GetBlobClient(fileName);
+                await blob.UploadAsync(fileContent);
 
 
-                return new OkObjectResult(file.FileName + " - " + file.Length.ToString() + " bytes");
+                var resp = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                resp.Body = new MemoryStream(Encoding.UTF8.GetBytes(fileName + " - " + fileContent.Length.ToString() + " bytes"));
+                return resp;
             }
             catch (Exception ex)
             {
-                return new BadRequestObjectResult(ex.Message);
+                var resp = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                resp.Body = new MemoryStream(Encoding.UTF8.GetBytes(ex.Message));
+                return resp;
             }
         }
     }

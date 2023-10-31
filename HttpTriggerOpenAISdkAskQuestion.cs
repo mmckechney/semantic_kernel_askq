@@ -1,98 +1,60 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Azure.Storage.Blobs;
+using DocumentQuestions.Function.Models;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System.Net.Http;  
-using System.Text;
-using Azure;
-using Azure.AI.OpenAI;
-using Azure.Identity;
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
+using System;
+using System.IO;
 using System.Linq;
-using Company.Function.Models;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace Company.Function
+namespace DocumentQuestions.Function
 {
-    public static class HttpTriggerAskAboutADoc
+    public class HttpTriggerAskAboutADoc
     {
-
+        ILogger<HttpTriggerAskAboutADoc> log;
+        IConfiguration config;
+        Common common;
+        AzureOpenAiService aiService;
+        public HttpTriggerAskAboutADoc(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Common common, AzureOpenAiService aiService)
+        {
+            this.log = log;
+            this.config = config;
+            this.common = common;
+            this.aiService = aiService;
+        }
 
         //function you can call to ask a question about a document.
-        [FunctionName("HttpTriggerOpenAiSdkAskQuestion")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
+        [Function("HttpTriggerOpenAiSdkAskQuestion")]
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req)
         {
             log.LogInformation("C# HTTP trigger function processed a request for HttpTriggerOpenAiSdkAskQuestion.");
 
             try
             {
-                (string filename, string question) = await Common.GetFilenameAndQuery(req, log);
-                var responseMessage = await AskOpenAIAsync(filename, question, log);
+                (string filename, string question) = await common.GetFilenameAndQuery(req);
+                var responseMessage = await aiService.AskOpenAIAsync(filename, question);
 
-                return new OkObjectResult(responseMessage);
+                var resp = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                resp.Body = new MemoryStream(Encoding.UTF8.GetBytes(responseMessage));
+
+                return resp;
             }
             catch (Exception ex)
             {
-                return new BadRequestObjectResult(ex.Message);
+                var resp = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                resp.Body = new MemoryStream(Encoding.UTF8.GetBytes(ex.Message));
+                return resp; ;
             }
 
 
         }
-        static async Task<string> AskOpenAIAsync(string filename, string prompt, ILogger log)
-        {
-            log.LogInformation("Ask OpenAI Async A Question");
+       
 
-            var content = await GetBlobContentAsync(filename, log);
-
-            var chatCompletionsOptions = Common.GetChatCompletionsOptions(content, prompt);
-            var completionsResponse = await Common.Client.GetChatCompletionsAsync(Common.ChatModel, chatCompletionsOptions);
-            string completion = completionsResponse.Value.Choices[0].Message.Content;
-
-            return completion;
-        }
-
-        public static async Task<string> GetBlobContentAsync(string blobName, ILogger log)
-        {
-            string connectionString = Environment.GetEnvironmentVariable("StorageConnectionString") ?? "DefaultConnection";
-            string containerName = Environment.GetEnvironmentVariable("ExtractedContainerName") ?? "DefaultContainer";
-
-
-
-            BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
-            BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-
-            var blobs = containerClient.GetBlobs(prefix: blobName);
-            log.LogInformation($"Number of blobs {blobs.Count()}");
-
-            var content = "";
-            foreach (var blob in blobs)
-            {
-                blobName = blob.Name;
-
-                BlobClient blobClient = containerClient.GetBlobClient(blobName);
-
-                // Open the blob and read its contents.  
-                using (Stream stream = await blobClient.OpenReadAsync())
-                {
-                    using (StreamReader reader = new StreamReader(stream))
-                    {
-                        var processedFile = JsonConvert.DeserializeObject<ProcessedFile>(await reader.ReadToEndAsync());
-                        content += processedFile.Content;
-
-
-                    }
-                }
-
-            }
-            return content;
-        }
+      
     }
 }
 

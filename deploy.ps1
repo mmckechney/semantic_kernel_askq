@@ -30,6 +30,5 @@ if(!$?){ exit }
 
 
 Write-Host "Publishing $functionAppName to $resourceGroupName" -ForegroundColor Green
-func azure functionapp publish $functionAppName --dotnet-version "7.0" --csharp
-
+func azure functionapp publish $functionAppName 
 
