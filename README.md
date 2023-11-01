@@ -27,6 +27,8 @@ To run the script, you will need to select an Azure location for deployment, the
 
 *NOTE:* The template assumes you have both `gpt-4-32k` and `text-embedding-ada-002` models deployed to your Azure OpenAI instance. If you want to use a different model, change the `openAIChatModel` and `openAIEmbeddingModel` default parameter values in `./infra/functions.bicep` file. Be aware, that using a different GPT model may result in max token violations with the example below.
 
+By default, the script will deploy an [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) instance and use it to store the results of the document processing and searching. If you do not want to deploy Azure Cognitive Search, you can use the `-useCognitiveSeach $false` parameter option to skip the deployment of Azure Cognitive Search and only use the `extracted` blob container to store the results of the document processing.
+
 ``` powershell
 # obtain an Azure access token
 az login
@@ -43,6 +45,8 @@ If successful, this process will create:
   - Role assigment for the function identity to access blob storage and call Azure OpenAI
 - Azure Cognitive Services account with system assigned managed identity
   - Role assigment for Cognitive Services identity for read access to `raw` container and write access to `extracted` container
+- Azure Cogitive Search account (optional with `-useCognitiveSeach` parameter)
+  
 
 ### Running Samples
 =======
@@ -53,6 +57,9 @@ Permissions:
 
 Create an Azure Function: c#, 6 Isolated LTS 
 
+
+If you have deployed the solution with the `-useCognitiveSeach` parameter, the `BlobTriggerProcessFile` will not only process the document and put the results into the `extracted` blob container, it will also put those results into the [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) index. Then, when using the `HttpTriggerSemanticKernelAskQuestion` method, it will use the Semantic Kernel AzureCognitiveSearchMemoryStore to search to search for documents and ask questions.\
+If you do not deploy the solution with the `-useCognitiveSeach` parameter, the `HttpTriggerSemanticKernelAskQuestion` will use a combination of the `extracted` blob container and Semantic Kernel VolatileMemoryStore to search for documents and ask questions.
 
 We will have the following functions in our Function App:
 

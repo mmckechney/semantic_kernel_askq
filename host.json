@@ -9,6 +9,9 @@
       "enableLiveMetricsFilters": true
     }
   },
+  "extensions": {
+    "blobs": {}
+  },
   "concurrency": {
     "dynamicConcurrencyEnabled": true,
     "snapshotPersistenceEnabled": true

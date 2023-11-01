@@ -5,96 +5,123 @@ targetScope = 'subscription'
 param location string
 param resourceGroupName string
 param functionAppName string
+param keyVaultName string
 param storageAccountName string
 param cognitiveServicesAccountName string
+param cognitiveSearchName string
 param openAiEndpoint string
 param openAiKey string
 param openAIChatModel string = 'gpt-4'
 param openAIEmbeddingModel string = 'text-embedding-ada-002'
-
+param useCognitiveSearch bool = true
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: resourceGroupName
-  location: location
+    name: resourceGroupName
+    location: location
 }
 
+module keyVault 'keyvault.bicep' = {
+    name: 'keyVault'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        location: location
+        keyVaultName: keyVaultName
+        openAiEndpoint : openAiEndpoint
+        openAiKey: openAiKey
+
+    }
+    dependsOn: [
+        rg
+    ]
+}
+
+module cognitiveSearch 'cognitivesearch.bicep' = if(useCognitiveSearch) {
+    name: 'cognitiveSearch'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        cognitiveSearchName: cognitiveSearchName
+        location: location
+        keyVaultName: keyVaultName
+    }
+    dependsOn: [
+        rg
+        keyVault
+    ]
+}
 module cognitiveServices 'cognitiveservices.bicep' = {
-  name: 'cognitiveServices'
-  scope: resourceGroup(resourceGroupName)
-  params: {
-    cognitiveServicesAccountName: cognitiveServicesAccountName
-    location: location
-  }
-  dependsOn: [
-    rg
-  ]
+    name: 'cognitiveServices'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        cognitiveServicesAccountName: cognitiveServicesAccountName
+        keyVaultName: keyVaultName
+        location: location
+    }
+    dependsOn: [
+        rg
+        keyVault
+    ]
 }
 module storageResources 'storage.bicep' = {
-  name: 'storageResources'
-  scope: resourceGroup(resourceGroupName)
-  params: {
-    storageAccountName: storageAccountName
-    location: location
-  }
-  dependsOn: [
-    rg
-  ]
+    name: 'storageResources'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        storageAccountName: storageAccountName
+        keyVaultName: keyVaultName
+        location: location
+    }
+    dependsOn: [
+        rg
+        keyVault
+    ]
 }
 
 module functionResources 'function.bicep' = {
-  name: 'azureResources'
-  scope: resourceGroup(resourceGroupName)
-  params: {
-    cognitiveServicesAccountName: cognitiveServicesAccountName
-    functionAppName: functionAppName
-    location: location
-    openAIChatModel: openAIChatModel
-    openAIEmbeddingModel: openAIEmbeddingModel
-    openAiEndpoint: openAiEndpoint
-    openAiKey: openAiKey
-    storageAccountName: storageAccountName
-    extractedBlobContainerName: storageResources.outputs.extractedContainerName
-    rawBlobContainerName: storageResources.outputs.rawContainerName
-  }
-  dependsOn: [
-    rg
-    storageResources
-    cognitiveServices
-  ]
+    name: 'azureResources'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        functionAppName: functionAppName
+        location: location
+        openAIChatModel: openAIChatModel
+        openAIEmbeddingModel: openAIEmbeddingModel
+        storageAccountName: storageAccountName
+        extractedBlobContainerName: storageResources.outputs.extractedContainerName
+        rawBlobContainerName: storageResources.outputs.rawContainerName
+        keyVaultName: keyVaultName
+    }
+    dependsOn: [
+        rg
+        storageResources
+    ]
 }
 
 module roleAssignments 'roleassignments.bicep' = {
-  name: 'roleAssignments'
-  scope: resourceGroup(resourceGroupName)
-  params: {
-    functionAppName: functionAppName
-    cognitiveServicesAccountName: cognitiveServicesAccountName
-    cogSvcsPrincipalId: cognitiveServices.outputs.cogsvcsPrincipalId
-    extractedBlobContainerName: storageResources.outputs.extractedContainerName
-    rawBlobContainerName: storageResources.outputs.rawContainerName
-    functionPrincipalId: functionResources.outputs.functionAppId
-    storageAccountName: storageAccountName
-  }
-  dependsOn: [
-    rg
-    functionResources
-    storageResources
-  ]
+    name: 'roleAssignments'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        functionAppName: functionAppName
+        cognitiveServicesAccountName: cognitiveServicesAccountName
+        cogSvcsPrincipalId: cognitiveServices.outputs.cogsvcsPrincipalId
+        extractedBlobContainerName: storageResources.outputs.extractedContainerName
+        rawBlobContainerName: storageResources.outputs.rawContainerName
+        functionPrincipalId: functionResources.outputs.functionAppId
+        storageAccountName: storageAccountName
+    }
+    dependsOn: [
+        rg
+        functionResources
+        storageResources
+    ]
 }
-
-
 
 var openAiUserRole = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 var functionAppId = functionResources.outputs.functionAppId
 resource func_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(functionAppName, openAiUserRole, subscription().id)
-  properties: {
-    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAiUserRole)
-    principalId: functionAppId
- }
-  dependsOn: [
-    functionResources
-  ]
- }
- 
-
+    name: guid(functionAppName, openAiUserRole, subscription().id)
+    properties: {
+        roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAiUserRole)
+        principalId: functionAppId
+    }
+    dependsOn: [
+        functionResources
+    ]
+}
