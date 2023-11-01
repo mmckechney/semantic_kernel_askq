@@ -26,6 +26,8 @@ To run the script, you will need to select an Azure location for deployment, the
 
 *NOTE:* The template assumes you have both `gpt-4-32k` and `text-embedding-ada-002` models deployed to your Azure OpenAI instance. If you want to use a different model, change the `openAIChatModel` and `openAIEmbeddingModel` default parameter values in `./infra/functions.bicep` file. Be aware, that using a different GPT model may result in max token violations with the example below.
 
+By default, the script will deploy an [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) instance and use it to store the results of the document processing and searching. If you do not want to deploy Azure Cognitive Search, you can use the `-useCognitiveSeach $false` parameter option to skip the deployment of Azure Cognitive Search and only use the `extracted` blob container to store the results of the document processing.
+
 ``` powershell
 # obtain an Azure access token
 az login
