@@ -52,7 +52,7 @@ namespace DocumentQuestions.Function
 
             semanticMemory = new MemoryBuilder()
                 .WithLoggerFactory(logFactory)
-                .WithAzureTextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
+                .WithAzureOpenAITextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
                 .WithMemoryStore(store)
                 .Build();
         }

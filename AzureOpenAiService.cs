@@ -15,10 +15,10 @@ namespace DocumentQuestions.Function
 {
     public class AzureOpenAiService
     {
-        ILogger<HttpTriggerAskAboutADoc> log;
+        ILogger<AzureOpenAiService> log;
         IConfiguration config;
         Common common;
-        public AzureOpenAiService(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Common common)
+        public AzureOpenAiService(ILogger<AzureOpenAiService> log, IConfiguration config, Common common)
         {
             this.log = log;
             this.config = config;
