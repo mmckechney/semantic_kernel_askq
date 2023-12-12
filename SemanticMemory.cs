@@ -1,8 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Azure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.AI.OpenAI;
-using Microsoft.SemanticKernel.Connectors.Memory.AzureCognitiveSearch;
+using Microsoft.SemanticKernel.Connectors.Memory.AzureAISearch;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.Plugins.Memory;
 using System;
@@ -11,6 +12,10 @@ using System.Threading.Tasks;
 
 namespace DocumentQuestions.Function
 {
+#pragma warning disable SKEXP0052 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning disable SKEXP0021 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning disable SKEXP0011 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
     public class SemanticMemory
     {
         ISemanticTextMemory semanticMemory;
@@ -33,6 +38,7 @@ namespace DocumentQuestions.Function
 
             var openAIEndpoint = config["OpenAIEndpoint"] ?? throw new ArgumentException("Missing OpenAIEndpoint in configuration.");
             var embeddingModel = config["OpenAIEmbeddingModel"] ?? throw new ArgumentException("Missing OpenAIEmbeddingModel in configuration.");
+            var embeddingDeploymentName = config["OpenAIEmbeddingDeploymentName"] ?? throw new ArgumentException("Missing OpenAIEmbeddingDeploymentName in configuration.");
             var apiKey = config["OpenAIKey"] ?? throw new ArgumentException("Missing OpenAIKey in configuration.");
             var cogSearchEndpoint = config["CognitiveSearchEndpoint"] ?? "";
             var cogSearchAdminKey = config["CognitiveSearchAdminKey"] ?? "";
@@ -41,20 +47,25 @@ namespace DocumentQuestions.Function
             if(string.IsNullOrWhiteSpace(cogSearchEndpoint) && string.IsNullOrWhiteSpace(cogSearchAdminKey))
             {
                 log.LogInformation("Cognitive Search not configured. Using in-memory store.");
+
                 store = new VolatileMemoryStore();
                 usingVolatileMemory = true;
             }
             else
             {
-                store = new AzureCognitiveSearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
+                store = new AzureAISearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
             }
-           
 
-            semanticMemory = new MemoryBuilder()
-                .WithLoggerFactory(logFactory)
-                .WithAzureOpenAITextEmbeddingGenerationService(embeddingModel, openAIEndpoint, apiKey)
+
+
+
+            var memBuilder = new MemoryBuilder()
                 .WithMemoryStore(store)
-                .Build();
+                .WithAzureOpenAITextEmbeddingGeneration(embeddingDeploymentName, embeddingModel, openAIEndpoint, apiKey)
+                .WithLoggerFactory(logFactory);
+
+            semanticMemory = memBuilder.Build();
+
         }
 
         public async Task StoreMemoryAsync(string collectionName, Dictionary<string, string> docFile)

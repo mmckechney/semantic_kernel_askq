@@ -75,7 +75,7 @@ namespace DocumentQuestions.Function
             var content = await common.GetBlobContentAsync(filename);
 
             var chatCompletionsOptions = GetChatCompletionsOptions(content, prompt);
-            var completionsResponse = await this.Client.GetChatCompletionsAsync(this.ChatModel, chatCompletionsOptions);
+            var completionsResponse = await this.Client.GetChatCompletionsAsync(chatCompletionsOptions);
             string completion = completionsResponse.Value.Choices[0].Message.Content;
 
             return completion;
@@ -99,23 +99,24 @@ namespace DocumentQuestions.Function
             };
 
             var chatCompletionsOptions = GetChatCompletionsOptions(content, prompt);
-            var completionsResponse = await this.Client.GetChatCompletionsAsync(this.ChatModel, chatCompletionsOptions);
+            var completionsResponse = await this.Client.GetChatCompletionsAsync(chatCompletionsOptions);
             string completion = completionsResponse.Value.Choices[0].Message.Content;
 
             return completion;
         }
 
-        public static ChatCompletionsOptions GetChatCompletionsOptions(string content, string prompt)
+        public ChatCompletionsOptions GetChatCompletionsOptions(string content, string prompt)
         {
             var opts = new ChatCompletionsOptions()
-            {
+            { 
                 Messages =
                   {
-                      new ChatMessage(ChatRole.System, @"You are a document answering bot.  You will be provided with information from a document, and you are to answer the question based on the content provided.  Your are not to make up answers. Use the content provided to answer the question."),
-                      new ChatMessage(ChatRole.User, @"Content = " + content),
-                      new ChatMessage(ChatRole.User, @"Question = " + prompt),
+                      new ChatRequestSystemMessage(@"You are a document answering bot.  You will be provided with information from a document, and you are to answer the question based on the content provided.  Your are not to make up answers. Use the content provided to answer the question."),
+                      new ChatRequestUserMessage(@"Content = " + content),
+                      new ChatRequestUserMessage(@"Question = " + prompt),
                   },
             };
+            opts.DeploymentName = config["OpenAIChatDeploymentName"];
 
             return opts;
         }
