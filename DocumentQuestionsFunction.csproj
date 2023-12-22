@@ -7,9 +7,9 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Azure.AI.FormRecognizer" Version="4.1.0" />
-		<PackageReference Include="Azure.AI.OpenAI" Version="1.0.0-beta.11" />
+		<PackageReference Include="Azure.AI.OpenAI" Version="1.0.0-beta.12" />
 		<PackageReference Include="Azure.Identity" Version="1.10.4" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.20.0-beta.1" />
 		<PackageReference Include="HttpMultipartParser" Version="8.2.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.2.0" />
@@ -21,9 +21,11 @@
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.1.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Storage" Version="6.2.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.16.4" />
-		<PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="5.2.1" />
-		<PackageReference Include="Microsoft.SemanticKernel" Version="1.0.0-rc3" />
-		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Memory.AzureAISearch" Version="1.0.0-rc3" />
+		<PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="5.2.2" />
+		<PackageReference Include="Microsoft.SemanticKernel" Version="1.0.1" />
+		<PackageReference Include="Microsoft.SemanticKernel.Abstractions" Version="1.0.1" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureAISearch" Version="1.0.1-alpha" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.0.1-alpha" />
    </ItemGroup>
 	<ItemGroup>
 		<None Update="appsettings.json">

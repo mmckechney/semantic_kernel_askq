@@ -1,11 +1,9 @@
-﻿using Microsoft.Extensions.Azure;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Connectors.AI.OpenAI;
-using Microsoft.SemanticKernel.Connectors.Memory.AzureAISearch;
+using Microsoft.SemanticKernel.Connectors.AzureAISearch;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Plugins.Memory;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -61,7 +59,7 @@ namespace DocumentQuestions.Function
 
             var memBuilder = new MemoryBuilder()
                 .WithMemoryStore(store)
-                .WithAzureOpenAITextEmbeddingGeneration(embeddingDeploymentName, embeddingModel, openAIEndpoint, apiKey)
+                .WithAzureOpenAITextEmbeddingGeneration(deploymentName: embeddingDeploymentName, modelId: embeddingModel, endpoint:openAIEndpoint, apiKey: apiKey)
                 .WithLoggerFactory(logFactory);
 
             semanticMemory = memBuilder.Build();
