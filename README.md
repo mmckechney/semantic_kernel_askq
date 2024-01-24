@@ -4,6 +4,7 @@
 
 This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) and [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) to ask question specific to that document.
 
+![ Architecture Diagram ](images/Architecture.png)
 ## What's Included
 
  This solution consists of C# function app which has 4 functions:
