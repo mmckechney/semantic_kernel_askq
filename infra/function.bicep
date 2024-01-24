@@ -4,7 +4,9 @@ param keyVaultName string
 param rawBlobContainerName string
 param extractedBlobContainerName string
 param openAIChatModel string = 'gpt-4-32k'
+param openAIChatDeploymentName string = 'gpt-4-32k'
 param openAIEmbeddingModel string = 'text-embedding-ada-002'
+param openAIEmbeddingDeploymentName string = 'text-embedding-ada-002'
 param location string = resourceGroup().location
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
@@ -84,8 +86,16 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: openAIChatModel
         }
         {
+          name: 'OpenAIChatDeploymentName'
+          value: openAIChatDeploymentName
+        }
+        {
           name: 'OpenAIEmbeddingModel'
           value: openAIEmbeddingModel
+        }
+        {
+          name: 'OpenAIEmbeddingDeploymentName'
+          value: openAIEmbeddingDeploymentName
         }
         {
           name: 'OpenAIKey'
@@ -120,12 +130,12 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: 'dotnet-isolated'
         }
         {
-            name: 'CognitiveSearchEndpoint'
-            value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchEndpoint)'
+          name: 'CognitiveSearchEndpoint'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchEndpoint)'
         }
         {
-            name: 'CognitiveSearchAdminKey'
-            value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchAdminKey)'
+          name: 'CognitiveSearchAdminKey'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchAdminKey)'
         }
       ]
     }
