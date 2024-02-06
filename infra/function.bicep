@@ -149,6 +149,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
     Application_Type: 'web'
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
+    WorkspaceResourceId: logAnalytics.id
   }
   tags: {
     // circular dependency means we can't reference functionApp directly  /subscriptions/<subscriptionId>/resourceGroups/<rg-name>/providers/Microsoft.Web/sites/<appName>"
@@ -157,6 +158,13 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
 }
 
 
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
+  name: '${functionAppName}-log'
+  location: location
+  properties: {
+    retentionInDays: 30
+  }
+}
 
 
 
