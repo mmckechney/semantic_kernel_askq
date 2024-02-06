@@ -1,16 +1,10 @@
 ﻿using Azure.Storage.Blobs;
-using DocumentQuestions.Function.Models;
-using Microsoft.Azure.Functions.Worker.Http;
+using DocumentQuestions.Library.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Text.Json;
 
-namespace DocumentQuestions.Function
+namespace DocumentQuestions.Library
 {
    public class Common
    {
@@ -22,31 +16,7 @@ namespace DocumentQuestions.Function
          this.config = config;
       }
 
-      public async Task<(string filename, string question)> GetFilenameAndQuery(HttpRequestData req)
-      {
-         string filename = req.Query["filename"];
-         string question = req.Query["question"];
-         string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-         log.LogInformation(requestBody);
-         dynamic data = JsonConvert.DeserializeObject(requestBody);
-         filename = filename ?? data?.filename;
-         question = question ?? data?.question;
 
-         if (string.IsNullOrWhiteSpace(filename))
-         {
-            filename = "general";
-         }
-         else
-         {
-            filename = Path.GetFileNameWithoutExtension(filename);
-         }
-
-
-         log.LogInformation("filename = " + filename);
-         log.LogInformation("question = " + question);
-
-         return (filename, question);
-      }
 
       public async Task<string> GetBlobContentAsync(string blobName)
       {
@@ -73,7 +43,7 @@ namespace DocumentQuestions.Function
             {
                using (StreamReader reader = new StreamReader(stream))
                {
-                  var processedFile = JsonConvert.DeserializeObject<ProcessedFile>(await reader.ReadToEndAsync());
+                  var processedFile = JsonSerializer.Deserialize<ProcessedFile>(await reader.ReadToEndAsync());
                   content += processedFile.Content;
 
 

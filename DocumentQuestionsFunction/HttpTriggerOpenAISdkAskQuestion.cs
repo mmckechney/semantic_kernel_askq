@@ -1,3 +1,4 @@
+using DocumentQuestions.Library;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -13,9 +14,9 @@ namespace DocumentQuestions.Function
    {
       ILogger<HttpTriggerAskAboutADoc> log;
       IConfiguration config;
-      Common common;
+      Helper common;
       AzureOpenAiService aiService;
-      public HttpTriggerAskAboutADoc(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Common common, AzureOpenAiService aiService)
+      public HttpTriggerAskAboutADoc(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Helper common, AzureOpenAiService aiService)
       {
          this.log = log;
          this.config = config;

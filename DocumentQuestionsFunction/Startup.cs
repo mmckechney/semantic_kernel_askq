@@ -1,6 +1,6 @@
 ﻿using Azure;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
-using DocumentQuestions.Function;
+using DocumentQuestions.Library;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 
-namespace DocumentQuestionsFunction
+namespace DocumentQuestions.Function
 {
    internal class Startup
    {
@@ -47,10 +47,11 @@ namespace DocumentQuestionsFunction
 
       private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
       {
-         services.AddSingleton<SemanticUtility>();
          services.AddSingleton<Common>();
+         services.AddSingleton<SemanticUtility>();
+         services.AddSingleton<Helper>();
          services.AddSingleton<AzureOpenAiService>();
-         services.AddSingleton<DocumentAnalysisClient>(sp =>
+         services.AddSingleton(sp =>
          {
             var config = sp.GetRequiredService<IConfiguration>();
 

@@ -3,12 +3,8 @@ using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel.Memory;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
-namespace DocumentQuestions.Function
+namespace DocumentQuestions.Library
 {
    public class AzureOpenAiService
    {

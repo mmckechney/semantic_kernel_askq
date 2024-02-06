@@ -1,8 +1,8 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace DocumentQuestions.Function.Models
+namespace DocumentQuestions.Library.Models
 {
-   internal class ProcessedFile
+   public class ProcessedFile
    {
       [JsonPropertyName("fileName")]
       public string FileName { get; set; }

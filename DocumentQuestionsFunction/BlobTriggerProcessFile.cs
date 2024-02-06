@@ -1,7 +1,7 @@
 using Azure;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
 using Azure.Storage.Blobs;
-using DocumentQuestions.Function.Models;
+using DocumentQuestions.Library;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -10,7 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-
+using DocumentQuestions.Library.Models;
 namespace DocumentQuestions.Function
 {
    public class BlobTriggerProcessFile

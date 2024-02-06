@@ -1,3 +1,4 @@
+using DocumentQuestions.Library;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -17,14 +18,14 @@ namespace DocumentQuestions.Function
       private SemanticUtility semanticUtility;
       ILogger<HttpTriggerAskAboutADoc> log;
       IConfiguration config;
-      Common common;
+      Helper common;
       AzureOpenAiService aiService;
-      public HttpTriggerSemanticKernelAskQuestion(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Common common, SemanticUtility semanticMemory, AzureOpenAiService aiService)
+      public HttpTriggerSemanticKernelAskQuestion(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Helper common, SemanticUtility semanticMemory, AzureOpenAiService aiService)
       {
          this.log = log;
          this.config = config;
          this.common = common;
-         this.semanticUtility = semanticMemory;
+         semanticUtility = semanticMemory;
          this.aiService = aiService;
       }
 
