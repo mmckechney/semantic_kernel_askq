@@ -4,6 +4,8 @@
 
 This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) and [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) to ask question specific to that document.
 
+**NOTE**: In addition to the Azure Function deployment below, a console app is also provided to demonstrate how to use the OpenAI SDK to ask questions about the document using the same deployed AI services.
+
 ![ Architecture Diagram ](images/Architecture.png)
 ## What's Included
 
@@ -33,7 +35,7 @@ By default, the script will deploy an [Azure Cognitive Search](https://azure.mic
 # obtain an Azure access token
 az login
 
-# deploy the solutin
+# deploy the solution
 .\deploy.ps1 -functionAppName  <function name>  -openAiEndpoint <http endpoint value> -openAiKey <openai key> -location <azure location>
 ```
 
