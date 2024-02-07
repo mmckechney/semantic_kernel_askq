@@ -43,23 +43,13 @@ namespace DocumentQuestions.Library
          var embeddingModel = config["OpenAIEmbeddingModel"] ?? throw new ArgumentException("Missing OpenAIEmbeddingModel in configuration.");
          var embeddingDeploymentName = config["OpenAIEmbeddingDeploymentName"] ?? throw new ArgumentException("Missing OpenAIEmbeddingDeploymentName in configuration.");
          var apiKey = config["OpenAIKey"] ?? throw new ArgumentException("Missing OpenAIKey in configuration.");
-         var cogSearchEndpoint = config["CognitiveSearchEndpoint"] ?? "";
-         var cogSearchAdminKey = config["CognitiveSearchAdminKey"] ?? "";
+         var cogSearchEndpoint = config["AiSearchEndpoint"] ?? throw new ArgumentException("Missing AiSearchEndpoint in configuration.");
+         var cogSearchAdminKey = config["AiSearchKey"] ?? throw new ArgumentException("Missing AiSearchKey in configuration.");
 
 
          //Build and configure Memory Store
-         IMemoryStore store;
-         if (string.IsNullOrWhiteSpace(cogSearchEndpoint) && string.IsNullOrWhiteSpace(cogSearchAdminKey))
-         {
-            log.LogInformation("Cognitive Search not configured. Using in-memory store.");
-
-            store = new VolatileMemoryStore();
-            usingVolatileMemory = true;
-         }
-         else
-         {
-            store = new AzureAISearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
-         }
+         IMemoryStore store = new AzureAISearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
+         
 
 
          var memBuilder = new MemoryBuilder()

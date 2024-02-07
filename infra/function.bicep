@@ -130,12 +130,12 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: 'dotnet-isolated'
         }
         {
-          name: 'CognitiveSearchEndpoint'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchEndpoint)'
+          name: 'AiSearchEndpoint'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AiSearchEndpoint)'
         }
         {
-          name: 'CognitiveSearchAdminKey'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchAdminKey)'
+          name: 'AiSearchKey'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AiSearchKey)'
         }
       ]
     }

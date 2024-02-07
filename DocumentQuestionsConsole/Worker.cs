@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using DocumentQuestions.Library;
 using System.CommandLine.Parsing;
 using Microsoft.SemanticKernel.Connectors.AzureAISearch;
+using Json.Schema.Generation.Intents;
 
 namespace DocumentQuestions.Console
 {
@@ -70,9 +71,15 @@ namespace DocumentQuestions.Console
          }
       }
 
-      internal static async Task ProcessFile(FileInfo file)
+      internal static async Task ProcessFile(string[] file)
       {
-         await documentIntelligence.ProcessDocument(file);
+         string name = string.Join(" ", file);
+         if(!File.Exists(name))
+         {
+            log.LogError($"The file {name} doesn't exist. Please enter a valid file name");
+            return;
+         }
+         await documentIntelligence.ProcessDocument(new FileInfo(name));
       }
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)

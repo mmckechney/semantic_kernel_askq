@@ -19,8 +19,8 @@ namespace DocumentQuestions.Library
       {
          this.log = log;
          this.config = config;
-         string endpoint = config["CognitiveSearchEndpoint"] ?? throw new ArgumentException("Missing CognitiveSearchEndpoint in configuration");
-         string key = config["CognitiveSearchAdminKey"] ?? throw new ArgumentException("Missing CognitiveSearchAdminKey in configuration");
+         string endpoint = config["AiSearchEndpoint"] ?? throw new ArgumentException("Missing AiSearchEndpoint in configuration");
+         string key = config["AiSearchKey"] ?? throw new ArgumentException("Missing AiSearchKey in configuration");
 
          // Create a client
          AzureKeyCredential credential = new AzureKeyCredential(key);

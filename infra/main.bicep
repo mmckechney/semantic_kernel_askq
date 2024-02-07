@@ -7,13 +7,13 @@ param resourceGroupName string
 param functionAppName string
 param keyVaultName string
 param storageAccountName string
-param cognitiveServicesAccountName string
-param cognitiveSearchName string
+param docIntelligenceAccountName string
+param aiSearchName string
 param openAiEndpoint string
 param openAiKey string
 param openAIChatModel string = 'gpt-4'
 param openAIEmbeddingModel string = 'text-embedding-ada-002'
-param useCognitiveSearch bool = true
+
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
     name: resourceGroupName
@@ -35,11 +35,11 @@ module keyVault 'keyvault.bicep' = {
     ]
 }
 
-module cognitiveSearch 'cognitivesearch.bicep' = if(useCognitiveSearch) {
-    name: 'cognitiveSearch'
+module aiSearch 'aisearch.bicep' = {
+    name: 'aiSearch'
     scope: resourceGroup(resourceGroupName)
     params: {
-        cognitiveSearchName: cognitiveSearchName
+        aiSearchName: aiSearchName
         location: location
         keyVaultName: keyVaultName
     }
@@ -48,11 +48,11 @@ module cognitiveSearch 'cognitivesearch.bicep' = if(useCognitiveSearch) {
         keyVault
     ]
 }
-module cognitiveServices 'cognitiveservices.bicep' = {
-    name: 'cognitiveServices'
+module docIntelligence 'docintelligence.bicep' = {
+    name: 'docIntelligence'
     scope: resourceGroup(resourceGroupName)
     params: {
-        cognitiveServicesAccountName: cognitiveServicesAccountName
+        docIntelAccountName: docIntelligenceAccountName
         keyVaultName: keyVaultName
         location: location
     }
@@ -99,8 +99,8 @@ module roleAssignments 'roleassignments.bicep' = {
     scope: resourceGroup(resourceGroupName)
     params: {
         functionAppName: functionAppName
-        cognitiveServicesAccountName: cognitiveServicesAccountName
-        cogSvcsPrincipalId: cognitiveServices.outputs.cogsvcsPrincipalId
+        cognitiveServicesAccountName: docIntelligenceAccountName
+        cogSvcsPrincipalId: docIntelligence.outputs.docIntelPrincipalId
         extractedBlobContainerName: storageResources.outputs.extractedContainerName
         rawBlobContainerName: storageResources.outputs.rawContainerName
         functionPrincipalId: functionResources.outputs.functionAppId
@@ -125,3 +125,5 @@ resource func_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-
         functionResources
     ]
 }
+
+output docIntelEndpoint string = docIntelligence.outputs.docIntelEndpoint

@@ -23,10 +23,10 @@ namespace DocumentQuestions.Console
          askQuestionCommand.Add(docOpt);
          askQuestionCommand.Handler = CommandHandler.Create<string[], string>(Worker.AskQuestion);
 
-         var fileOpt = new Option<FileInfo>(new string[] { "--file", "-f" }, "File to process") { IsRequired = true };
+         var fileArg = new Argument<string[]>("file", "Path to the file to process and index") { Arity = ArgumentArity.ZeroOrMore };
          var uploadCommand = new Command("process", "Process the file contents against Document Intelligence and add to Azure AI Search index");
-         uploadCommand.Add(fileOpt);
-         uploadCommand.Handler = CommandHandler.Create<FileInfo>(Worker.ProcessFile);
+         uploadCommand.Add(fileArg);
+         uploadCommand.Handler = CommandHandler.Create<string[]>(Worker.ProcessFile);
 
 
          var listCommand = new Command("list", "List the available files to ask questions about");

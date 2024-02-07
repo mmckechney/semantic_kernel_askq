@@ -1,11 +1,11 @@
-﻿param cognitiveSearchName string
+﻿param aiSearchName string
 param keyVaultName string
 param location string = resourceGroup().location
 
 
 
-resource cognitiveSearchInstance 'Microsoft.Search/searchServices@2022-09-01' = {
-  name: cognitiveSearchName
+resource aiSearchInstance 'Microsoft.Search/searchServices@2022-09-01' = {
+  name: aiSearchName
   location: location
   sku: {
     name: 'basic'
@@ -18,16 +18,16 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
 
 resource adminKey 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
   parent: keyVault
-  name: 'CognitiveSearchAdminKey'
+  name: 'AiSearchKey'
   properties: {
-    value:  cognitiveSearchInstance.listAdminKeys().primaryKey
+    value:  aiSearchInstance.listAdminKeys().primaryKey
   }
 }
 
 resource endPoint 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
   parent: keyVault
-  name: 'CognitiveSearchEndpoint'
+  name: 'AiSearchEndpoint'
   properties: {
-    value: 'https://${cognitiveSearchName}.search.windows.net'
+    value: 'https://${aiSearchName}.search.windows.net'
   }
 }
