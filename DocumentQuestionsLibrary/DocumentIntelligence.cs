@@ -91,7 +91,7 @@ namespace DocumentQuestions.Library
                {
                   if (content.Length + paragraph.Content.Length < 4000)
                   {
-                     content += paragraph.Content;
+                     content += paragraph.Content + Environment.NewLine;
                   }
                   else
                   {
@@ -99,7 +99,7 @@ namespace DocumentQuestions.Library
                      docContent.Add(GetFileName(fileName, counter), content);
                      counter++;
 
-                     content = paragraph.Content;
+                     content = paragraph.Content + Environment.NewLine;
                   }
                }
 
