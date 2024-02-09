@@ -45,6 +45,7 @@ namespace DocumentQuestions.Console
          rootCommand.Add(askQuestionCommand);
          rootCommand.Add(uploadCommand);
          rootCommand.Add(listCommand);
+         rootCommand.Add(AIRuntimeSetCommand());
 
          //rootCommand.Add(searchCommand);
          //rootCommand.Add(generateCommand);
@@ -64,6 +65,30 @@ namespace DocumentQuestions.Console
          return parser;
       }
 
+
+      private static Command AIRuntimeSetCommand()
+      {
+         var chatModelOpt = new Option<string>(new string[] { "--chat-model", "--cm" }, "Name of GPT chat model to use (must match model associated with chat deployment)");
+         var chatDepoymentOpt = new Option<string>(new string[] { "--chat-deployment", "--cd" }, "Name of GPT chat deployment to use");
+
+         var embedModelOpt = new Option<string>(new string[] { "--embed-model", "--em" }, "Name of model to use for text embedding (must match model associated with embedding deployment)");
+         var embedDepoymentOpt = new Option<string>(new string[] { "--embed-deployment", "--ed" }, "Name of text embedding deployment to use");
+
+         var listAICmd = new Command("list", "List the configured Azure OpenAI settings");
+         listAICmd.Handler = CommandHandler.Create(Worker.ListAiSettings);
+         
+         
+         var aiCmd = new Command("ai", "Change Azure OpenAI model and deployment runtime settings")
+         {
+            listAICmd,
+            chatModelOpt,
+            chatDepoymentOpt,
+            embedModelOpt,
+            embedDepoymentOpt
+         };
+         aiCmd.Handler = CommandHandler.Create<string, string, string, string>(Worker.AzureOpenAiSettings);
+         return aiCmd;
+      }
 
    }
 }

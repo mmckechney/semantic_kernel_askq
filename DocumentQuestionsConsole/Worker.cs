@@ -62,6 +62,55 @@ namespace DocumentQuestions.Console
          lastDocument = doc;
       }
 
+      internal static void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
+      {
+         bool changed = false;
+         if(!string.IsNullOrWhiteSpace(chatModel))
+         {
+            config["OpenAIChatModel"] = chatModel;
+            log.LogInformation(new() { { "Set chat model to", ConsoleColor.DarkYellow }, { chatModel, ConsoleColor.Yellow } });
+            changed = true;
+         }
+         if(!string.IsNullOrWhiteSpace(chatDeployment))
+         {
+            config["OpenAIChatDeploymentName"] = chatDeployment;
+            log.LogInformation(new() { { "Set chat deployment to", ConsoleColor.DarkYellow }, { chatDeployment, ConsoleColor.Yellow } });
+            changed = true;
+         }
+         if(!string.IsNullOrWhiteSpace(embedModel))
+         {
+            config["OpenAIEmbeddingModel"] = embedModel;
+            log.LogInformation(new() { { "Set embedding model to", ConsoleColor.DarkYellow }, { embedModel, ConsoleColor.Yellow } });
+            changed = true;
+         }
+         if(!string.IsNullOrWhiteSpace(embedDeployment))
+         {
+            config["OpenAIEmbeddingDeploymentName"] = embedDeployment;
+            log.LogInformation(new() { { "Set embedding deployment to", ConsoleColor.DarkYellow }, { embedDeployment, ConsoleColor.Yellow } });
+            changed = true;
+         }
+
+         if(changed)
+         {
+            semanticUtility.InitMemoryAndKernel();
+            ListAiSettings();
+         }
+      }
+
+      internal static void ListAiSettings()
+      {
+         int pad = 21;
+         log.LogInformation("-------------------------------------");
+         log.LogInformation("Azure OpenAI settings", ConsoleColor.Gray);
+         log.LogInformation(new() { { "Chat Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config["OpenAIChatModel"], ConsoleColor.Blue } });
+         log.LogInformation(new() { { "Chat Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config["OpenAIChatDeploymentName"], ConsoleColor.Blue } });
+         log.LogInformation(new() { { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config["OpenAIEmbeddingModel"], ConsoleColor.Blue } });
+         log.LogInformation(new() { { "Embedding Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config["OpenAIEmbeddingDeploymentName"], ConsoleColor.Blue } });
+         log.LogInformation("-------------------------------------");
+
+
+      }
+
       internal async static Task ListFiles(object t)
       {
          var names = await aiSearch.ListAvailableIndexes();
