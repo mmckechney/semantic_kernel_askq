@@ -74,19 +74,28 @@ namespace DocumentQuestions.Console
          var embedModelOpt = new Option<string>(new string[] { "--embed-model", "--em" }, "Name of model to use for text embedding (must match model associated with embedding deployment)");
          var embedDepoymentOpt = new Option<string>(new string[] { "--embed-deployment", "--ed" }, "Name of text embedding deployment to use");
 
+         var genModelOpt = new Option<string>(new string[] { "--gen-model", "--gm" }, "Name of model to use for address generation (must match model associated with embedding deployment)");
+         var genDepoymentOpt = new Option<string>(new string[] { "--gen-deployment", "--gd" }, "Name of address generation deployment to use");
+
          var listAICmd = new Command("list", "List the configured Azure OpenAI settings");
          listAICmd.Handler = CommandHandler.Create(Worker.ListAiSettings);
-         
-         
-         var aiCmd = new Command("ai", "Change Azure OpenAI model and deployment runtime settings")
+
+
+         var aiSetCmd = new Command("set", "Change the Azure OpenAI model and deployment runtime settings")
          {
             listAICmd,
             chatModelOpt,
             chatDepoymentOpt,
             embedModelOpt,
-            embedDepoymentOpt
+            embedDepoymentOpt,
+            genModelOpt,
+            genDepoymentOpt
          };
-         aiCmd.Handler = CommandHandler.Create<string, string, string, string>(Worker.AzureOpenAiSettings);
+         aiSetCmd.Handler = CommandHandler.Create<string, string, string, string>(Worker.AzureOpenAiSettings);
+
+         var aiCmd = new Command("ai", "Change or List Azure OpenAI model and deployment runtime settings");
+         aiCmd.Add(aiSetCmd);
+         aiCmd.Add(listAICmd);
          return aiCmd;
       }
 
