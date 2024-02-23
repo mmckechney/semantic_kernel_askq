@@ -30,7 +30,7 @@ Write-Host "Azure OpenAI embedding model: $openAIEmbeddingModel" -ForegroundColo
 Write-Host "Azure OpenAI embedding deployment name: $openAIEmbeddingDeploymentName" -ForegroundColor Green
 Write-Host "Azure Open AI Endpoint: $openAiEndpoint" -ForegroundColor Green
 
-$result =  az deployment sub create --name "docintelligence" --location $location  --template-file ./infra/main.bicep `
+$result =  az deployment sub create --name "docintelligence2" --location $location  --template-file ./infra/main.bicep `
     --parameters resourceGroupName=$resourceGroupName location=$location `
     functionAppName=$functionAppName storageAccountName=$storageAccountName `
     docIntelligenceAccountName=$docIntelligenceAccountName aiSearchName=$aiSearchName `
