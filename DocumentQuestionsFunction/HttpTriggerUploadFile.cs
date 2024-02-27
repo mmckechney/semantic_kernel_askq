@@ -16,9 +16,9 @@ namespace DocumentQuestions.Function
 {
    public class HttpTriggerUploadFile
    {
-      ILogger<HttpTriggerAskAboutADoc> log;
+      ILogger<HttpTriggerUploadFile> log;
       IConfiguration config;
-      public HttpTriggerUploadFile(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config)
+      public HttpTriggerUploadFile(ILogger<HttpTriggerUploadFile> log, IConfiguration config)
       {
          this.log = log;
          this.config = config;

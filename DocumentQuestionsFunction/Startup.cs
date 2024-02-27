@@ -50,7 +50,6 @@ namespace DocumentQuestions.Function
          services.AddSingleton<Common>();
          services.AddSingleton<SemanticUtility>();
          services.AddSingleton<Helper>();
-         services.AddSingleton<AzureOpenAiService>();
          services.AddSingleton(sp =>
          {
             var config = sp.GetRequiredService<IConfiguration>();

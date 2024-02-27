@@ -51,9 +51,16 @@ namespace DocumentQuestions.Console
          string quest = string.Join(" ", question);
          s.Console.WriteLine("----------------------");
          var docContent = await  semanticUtility.SearchForReleventContent(doc, quest);
-         await foreach(var bit in semanticUtility.AskQuestionStreaming(quest, docContent))
+         if (string.IsNullOrWhiteSpace(docContent))
          {
-            s.Console.Write(bit);
+            log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
+         }
+         else
+         {
+            await foreach (var bit in semanticUtility.AskQuestionStreaming(quest, docContent))
+            {
+               s.Console.Write(bit);
+            }
          }
 
          s.Console.WriteLine();
@@ -142,20 +149,14 @@ namespace DocumentQuestions.Console
          StringBuilder sb;
          while (true)
          {
-            s.Console.ForegroundColor = ConsoleColor.White;
             sb = new StringBuilder();
             s.Console.WriteLine();
             if(!string.IsNullOrWhiteSpace(lastDocument))
             {
-               s.Console.ForegroundColor = ConsoleColor.DarkGreen;
-               s.Console.WriteLine("Active Document for questions: " + lastDocument);
-               s.Console.ResetColor();
-               s.Console.ForegroundColor = ConsoleColor.DarkYellow;
-               s.Console.WriteLine("use '--doc' flag to change the active document for questions.");
+               log.LogInformation(new() { { "Active Document: ", ConsoleColor.DarkGreen }, { lastDocument, ConsoleColor.Blue } });
+               log.LogInformation("use '--doc' flag to change the active document.", ConsoleColor.Yellow);
             }
-            s.Console.ForegroundColor = ConsoleColor.Cyan;
             s.Console.Write("dq> ");
-            s.Console.ResetColor();
             var line = s.Console.ReadLine();
             if (line == null)
             {

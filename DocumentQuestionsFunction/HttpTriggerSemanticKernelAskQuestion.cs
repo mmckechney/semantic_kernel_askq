@@ -16,17 +16,16 @@ namespace DocumentQuestions.Function
    public class HttpTriggerSemanticKernelAskQuestion
    {
       private SemanticUtility semanticUtility;
-      ILogger<HttpTriggerAskAboutADoc> log;
+      ILogger<HttpTriggerSemanticKernelAskQuestion> log;
       IConfiguration config;
       Helper common;
-      AzureOpenAiService aiService;
-      public HttpTriggerSemanticKernelAskQuestion(ILogger<HttpTriggerAskAboutADoc> log, IConfiguration config, Helper common, SemanticUtility semanticMemory, AzureOpenAiService aiService)
+
+      public HttpTriggerSemanticKernelAskQuestion(ILogger<HttpTriggerSemanticKernelAskQuestion> log, IConfiguration config, Helper common, SemanticUtility semanticMemory)
       {
          this.log = log;
          this.config = config;
          this.common = common;
          semanticUtility = semanticMemory;
-         this.aiService = aiService;
       }
 
 
