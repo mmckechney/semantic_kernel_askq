@@ -14,14 +14,17 @@ namespace DocumentQuestions.Console
    {
       public static Parser BuildCommandLine()
       {
-         var questionOpt = new Option<string[]>(new string[] { "--question", "-q" }, "Question to ask about the document") { IsRequired = true };
-         var questionArg = new Argument<string[]>("question", "Question to ask about the document") { Arity = ArgumentArity.ZeroOrMore };
+         
          var docOpt = new Option<string>(new string[] { "--doc", "-d" },() => "", "Name of the document to inquire about.") { IsRequired = true };
-        
+         var docCommand = new Command("doc", "Set the active document to start asking questions");
+         var documentArg = new Argument<string[]>("document", "Document to set as active") { Arity = ArgumentArity.ZeroOrMore };
+         docCommand.Add(documentArg);
+         docCommand.Handler = CommandHandler.Create<string[]>(Worker.SetActiveDocument);
+
+         var questionArg = new Argument<string[]>("question", "Question to ask about the document") { Arity = ArgumentArity.ZeroOrMore };
          var askQuestionCommand = new Command("ask", "Ask a question on the document(s)");
          askQuestionCommand.Add(questionArg);
-         askQuestionCommand.Add(docOpt);
-         askQuestionCommand.Handler = CommandHandler.Create<string[], string>(Worker.AskQuestion);
+         askQuestionCommand.Handler = CommandHandler.Create<string[]>(Worker.AskQuestion);
 
          var fileArg = new Argument<string[]>("file", "Path to the file to process and index") { Arity = ArgumentArity.ZeroOrMore };
          var uploadCommand = new Command("process", "Process the file contents against Document Intelligence and add to Azure AI Search index");
@@ -32,23 +35,16 @@ namespace DocumentQuestions.Console
          var listCommand = new Command("list", "List the available files to ask questions about");
          listCommand.Handler = CommandHandler.Create(Worker.ListFiles);
 
-         var generateCount = new Argument<int>("count", "Number of random addreses to generate and add to AI Search Index") { Arity = ArgumentArity.ExactlyOne };
-         var generateCommand = new Command("generate", "Uses Azure OpenAI to generate random addresses to add to Azure AI Search");
-         generateCommand.Add(generateCount);
-         //generateCommand.Handler = CommandHandler.Create<int>(Worker.GenerateAddresses);
-
 
          RootCommand rootCommand = new RootCommand(description: $"Utility to ask questions on documents that have been indexed in Azure AI Search");
          rootCommand.Add(questionArg);
-         rootCommand.Add(docOpt);
-         rootCommand.Handler = CommandHandler.Create<string[], string>(Worker.AskQuestion);
+         rootCommand.Handler = CommandHandler.Create<string[]>(Worker.AskQuestion);
+         rootCommand.Add(docCommand);
          rootCommand.Add(askQuestionCommand);
          rootCommand.Add(uploadCommand);
          rootCommand.Add(listCommand);
          rootCommand.Add(AIRuntimeSetCommand());
 
-         //rootCommand.Add(searchCommand);
-         //rootCommand.Add(generateCommand);
          var parser = new CommandLineBuilder(rootCommand)
               .UseDefaults()
               .UseHelp(ctx =>
@@ -74,9 +70,6 @@ namespace DocumentQuestions.Console
          var embedModelOpt = new Option<string>(new string[] { "--embed-model", "--em" }, "Name of model to use for text embedding (must match model associated with embedding deployment)");
          var embedDepoymentOpt = new Option<string>(new string[] { "--embed-deployment", "--ed" }, "Name of text embedding deployment to use");
 
-         var genModelOpt = new Option<string>(new string[] { "--gen-model", "--gm" }, "Name of model to use for address generation (must match model associated with embedding deployment)");
-         var genDepoymentOpt = new Option<string>(new string[] { "--gen-deployment", "--gd" }, "Name of address generation deployment to use");
-
          var listAICmd = new Command("list", "List the configured Azure OpenAI settings");
          listAICmd.Handler = CommandHandler.Create(Worker.ListAiSettings);
 
@@ -87,9 +80,7 @@ namespace DocumentQuestions.Console
             chatModelOpt,
             chatDepoymentOpt,
             embedModelOpt,
-            embedDepoymentOpt,
-            genModelOpt,
-            genDepoymentOpt
+            embedDepoymentOpt
          };
          aiSetCmd.Handler = CommandHandler.Create<string, string, string, string>(Worker.AzureOpenAiSettings);
 

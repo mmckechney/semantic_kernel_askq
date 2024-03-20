@@ -59,9 +59,10 @@ namespace DocumentQuestions.Library
          var docContent = new Dictionary<string, string>();
 
          //Split by page if there is content...
+         log.LogInformation("Checking document data...");
          foreach (DocumentPage page in result.Pages)
          {
-            log.LogInformation("Checking out document data...");
+            
             for (int i = 0; i < page.Lines.Count; i++)
             {
                DocumentLine line = page.Lines[i];

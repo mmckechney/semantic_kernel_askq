@@ -43,25 +43,21 @@ If successful, this process will create:
 
 - Storage account with two blob containers (`raw` for uploaded documents and `extracted` for processed output)
 - Application Insights instance
-- Function app with 4 functions with system assigned managed identity
+- Function app with 3 functions with system assigned managed identity
   - Role assigment for the function identity to access blob storage and call Azure OpenAI
 - Azure Cognitive Services account with system assigned managed identity
   - Role assigment for Cognitive Services identity for read access to `raw` container and write access to `extracted` container
-- Azure Cogitive Search account (optional with `-useCognitiveSeach` parameter)
+- Azure Cogitive Search account
+- *In addition, it will configure, compile and start the demo console app.*
   
 
-### Running Samples
+### Running Samples via Azure Functions
 
-If you have deployed the solution with the `-useCognitiveSeach` parameter, the `BlobTriggerProcessFile` will not only process the document and put the results into the `extracted` blob container, it will also put those results into the [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) index. Then, when using the `HttpTriggerSemanticKernelAskQuestion` method, it will use the Semantic Kernel AzureCognitiveSearchMemoryStore to search to search for documents and ask questions.\
-If you do not deploy the solution with the `-useCognitiveSeach` parameter, the `HttpTriggerSemanticKernelAskQuestion` will use a combination of the `extracted` blob container and Semantic Kernel VolatileMemoryStore to search for documents and ask questions.
+1. Upload a document using the `HttpTriggerUploadFile` REST API. 
+For this example, download and use [US Declaration of Independence as a PDF file](https://uscode.house.gov/download/annualhistoricalarchives/pdf/OrganicLaws2006/decind.pdf)
+2. Once the file i uploaded, the `BlobTriggerProcessFile` will automatically trigger, process it with Document Intelligence and create a new folder called `decind` in the `extracted` blob container and save 3 JSON files.
 
-We will have the following functions in our Function App:
-
-1. Upload a document using the `HttpTriggerUploadFile` REST API. \
-For this example, download and use [US Declaration of Independence as a PDF file](https://uscode.house.gov/download/annualhistoricalarchives/pdf/OrganicLaws2006/decind.pdf) \
-Once the file us uploaded, the `BlobTriggerProcessFile` will automatically trigger, process it with Document Intelligence and create a new folder called `decind` in the `extracted` blob container and save 3 JSON files.
-
-2. Ask questions using the `HttpTriggerSemanticKernelAskQuestion` and/or `HttpTriggerOpenAiSdkAskQuestion` function - this uses semantic config to only load max of 2 pages to reduce tokens provided to Azure OpenAI.
+3. Ask questions using the `HttpTriggerSemanticKernelAskQuestion` function - this uses semantic config to only load max of 2 pages to reduce tokens provided to Azure OpenAI.
 
    Question:
 
@@ -94,6 +90,41 @@ Once the file us uploaded, the `BlobTriggerProcessFile` will automatically trigg
    - The fundamental principles of their new government would be based on the belief that all men are created equal with certain unalienable rights including life, liberty, and the pursuit of happiness, and if any government becomes destructive of these ends, it is the right of the people to alter or abolish it, and to institute a new government.
    ```
 
+### Running Samples via Console App
+
+If you used the `deploy.ps1` script, the console app will be compiled and started automatically. Otherwise, you can run the console app by opening the `DocumentQuestionsFunction.sln` in Visual Studio or VS Code and running the `DocumentQuestionsConsole` project.
+
+1. Open the console app. If this is your first time running the app or the Functions, you will not have any documents processed and you will be prompted to upload a document with the `process` 
+
+   ![first time running the app](images/first-run.png)
+
+2. Upload a document using the `process` command
+
+   ![file processing](images/file-processing.png)
+
+3. Set the current document using the `doc` command
+
+   ![active document](images/active-document.png)
+
+4. Start ask questions!
+
+   ![question](images/question1.png)
+
+   ![question](images/question2.png)
+
+### Other Console App Features
+
+- `list` - list all the documents processed
+
+   ![list command](images/list.png)
+
+- `ai list` - list the Azure OpenAI models configured for the app
+
+   ![ai list command](images/ai-list.png)   
+
+- `ai set` - set the Azure OpenAI model to use for asking questions (these must already be deployed in your Azure AI instance)
+
+   ![ai set command](images/ai-set.png)
 ### What's next?
 
 Try uploading your own documents and start asking questions!

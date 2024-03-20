@@ -24,7 +24,7 @@ namespace DocumentQuestions.Console
       private static Common common;
       private static Parser rootParser;
       private static DocumentIntelligence documentIntelligence;
-      private static string lastDocument = string.Empty;
+      private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
       public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, SemanticUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
       {
@@ -38,19 +38,20 @@ namespace DocumentQuestions.Console
          aiSearch = aiSrch;
       }
 
-      internal static async Task AskQuestion(string[] question, string doc)
+      internal static async Task AskQuestion(string[] question)
       {
          if(question == null || question.Length == 0)
          {
             return;
          }
-         if(string.IsNullOrWhiteSpace(doc) && !string.IsNullOrWhiteSpace(lastDocument))
+         if(string.IsNullOrWhiteSpace(activeDocument))
          {
-            doc = lastDocument;
+            //log.LogInformation("Please use the 'doc' command to set an active document to start asking questions.", ConsoleColor.Yellow);
+            return;
          }
          string quest = string.Join(" ", question);
          s.Console.WriteLine("----------------------");
-         var docContent = await  semanticUtility.SearchForReleventContent(doc, quest);
+         var docContent = await  semanticUtility.SearchForReleventContent(activeDocument, quest);
          if (string.IsNullOrWhiteSpace(docContent))
          {
             log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
@@ -66,11 +67,15 @@ namespace DocumentQuestions.Console
          s.Console.WriteLine();
          s.Console.WriteLine("----------------------");
          s.Console.WriteLine();
-         lastDocument = doc;
       }
 
-      internal static void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
+      internal static async void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
       {
+         if(string.IsNullOrWhiteSpace(chatModel) && string.IsNullOrWhiteSpace(chatDeployment) && string.IsNullOrWhiteSpace(embedModel) && string.IsNullOrWhiteSpace(embedDeployment))
+         {
+            await rootParser.InvokeAsync("ai set -h");
+            return;
+         }
          bool changed = false;
          if(!string.IsNullOrWhiteSpace(chatModel))
          {
@@ -118,24 +123,40 @@ namespace DocumentQuestions.Console
 
       }
 
-      internal async static Task ListFiles(object t)
+      internal async static Task<int> ListFiles(object t)
       {
          var names = await aiSearch.ListAvailableIndexes();
+         if(names.Count > 0)
+         {
+            log.LogInformation("List of available documents:", ConsoleColor.Yellow);
+         }
          foreach(var name in names)
          {
             log.LogInformation(name);
          }
+         return names.Count;
       }
 
       internal static async Task ProcessFile(string[] file)
       {
+         if(file.Length == 0)
+         {
+            log.LogInformation("Please enter a file name to process", ConsoleColor.Red);
+            return;
+         }
          string name = string.Join(" ", file);
          if(!File.Exists(name))
          {
-            log.LogError($"The file {name} doesn't exist. Please enter a valid file name");
+            log.LogInformation($"The file {name} doesn't exist. Please enter a valid file name", ConsoleColor.Red);
             return;
          }
          await documentIntelligence.ProcessDocument(new FileInfo(name));
+      }
+
+      internal static void SetActiveDocument(string[] document)
+      {
+         var docName = string.Join(" ", document);
+         activeDocument = docName;
       }
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -145,17 +166,38 @@ namespace DocumentQuestions.Console
          string[] args = startArgs.Args;
          if (args.Length == 0) args = new string[] { "-h" };
          int val = await rootParser.InvokeAsync(args);
-
+         bool firstPass = true;
+         int fileCount = 0;
          StringBuilder sb;
          while (true)
          {
             sb = new StringBuilder();
             s.Console.WriteLine();
-            if(!string.IsNullOrWhiteSpace(lastDocument))
+            if (firstPass && string.IsNullOrWhiteSpace(activeDocument))
             {
-               log.LogInformation(new() { { "Active Document: ", ConsoleColor.DarkGreen }, { lastDocument, ConsoleColor.Blue } });
-               log.LogInformation("use '--doc' flag to change the active document.", ConsoleColor.Yellow);
+               fileCount = await rootParser.InvokeAsync("list");
             }
+
+            if (fileCount > 0)
+            {
+               if (!string.IsNullOrWhiteSpace(activeDocument))
+               {
+                  log.LogInformation(new() { { "Active Document: ", ConsoleColor.DarkGreen }, { activeDocument, ConsoleColor.Blue } });
+                  //log.LogInformation("use '--doc' flag to change the active document.", ConsoleColor.Yellow);
+               }
+               else
+               {
+                  log.LogInformation("Please use the 'doc' command to set an active document to start asking questions. Use 'list' to show available documents or 'process' to index a new document", ConsoleColor.Yellow);
+                  log.LogInformation("");
+               }
+            }
+            else
+            {
+               log.LogInformation("Please use the 'process' command to process your first document.", ConsoleColor.Yellow);
+               log.LogInformation("");
+            }
+
+           
             s.Console.Write("dq> ");
             var line = s.Console.ReadLine();
             if (line == null)
@@ -163,6 +205,7 @@ namespace DocumentQuestions.Console
                return;
             }
             val = await rootParser.InvokeAsync(line);
+            firstPass = false;
          }
       }
    }

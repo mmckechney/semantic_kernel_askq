@@ -105,7 +105,7 @@ namespace DocumentQuestions.Library
   
       public async Task StoreMemoryAsync(string collectionName, Dictionary<string, string> docFile)
       {
-         log.LogInformation("Storing memory...");
+         log.LogInformation($"Storing memory to AI Search collection '{collectionName}'...");
          var i = 0;
          foreach (var entry in docFile)
          {
@@ -116,12 +116,8 @@ namespace DocumentQuestions.Library
                 description: entry.Value,
                 text: entry.Value);
 
-            log.LogInformation($" #{++i} saved.");
+            log.LogDebug($" #{++i} saved to {collectionName}.");
          }
-
-         log.LogInformation("\n----------------------");
-
-
       }
       public async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(string collectionName, string query)
       {
