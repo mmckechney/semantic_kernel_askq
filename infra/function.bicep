@@ -52,6 +52,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
+      netFrameworkVersion: 'v8.0'
       appSettings: [
         {
           name: 'AzureWebJobsStorage'
@@ -130,12 +131,12 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: 'dotnet-isolated'
         }
         {
-          name: 'CognitiveSearchEndpoint'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchEndpoint)'
+          name: 'AiSearchEndpoint'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AiSearchEndpoint)'
         }
         {
-          name: 'CognitiveSearchAdminKey'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=CognitiveSearchAdminKey)'
+          name: 'AiSearchKey'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AiSearchKey)'
         }
       ]
     }
@@ -149,6 +150,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
     Application_Type: 'web'
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
+    WorkspaceResourceId: logAnalytics.id
   }
   tags: {
     // circular dependency means we can't reference functionApp directly  /subscriptions/<subscriptionId>/resourceGroups/<rg-name>/providers/Microsoft.Web/sites/<appName>"
@@ -157,6 +159,13 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
 }
 
 
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
+  name: '${functionAppName}-log'
+  location: location
+  properties: {
+    retentionInDays: 30
+  }
+}
 
 
 

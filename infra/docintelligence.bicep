@@ -1,9 +1,9 @@
-param cognitiveServicesAccountName string 
+param docIntelAccountName string 
 param keyVaultName string
 param location string = resourceGroup().location
 
-resource cognitiveServicesAccount 'Microsoft.CognitiveServices/accounts@2021-04-30' = {
-  name: cognitiveServicesAccountName
+resource docIntelAccount 'Microsoft.CognitiveServices/accounts@2021-04-30' = {
+  name: docIntelAccountName
   location: location
   kind: 'CognitiveServices'
   identity: {
@@ -25,7 +25,7 @@ resource adminKey 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
   parent: keyVault
   name: 'DocumentIntelligenceSubscriptionKey'
   properties: {
-    value:  cognitiveServicesAccount.listKeys().key1
+    value:  docIntelAccount.listKeys().key1
   }
 }
 
@@ -33,9 +33,11 @@ resource endPoint 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
   parent: keyVault
   name: 'DocumentIntelligenceEndpoint'
   properties: {
-    value:  cognitiveServicesAccount.properties.endpoint
+    value:  docIntelAccount.properties.endpoint
   }
 }
 
 
-output cogsvcsPrincipalId string = cognitiveServicesAccount.identity.principalId
+output docIntelPrincipalId string = docIntelAccount.identity.principalId
+output docIntelEndpoint string = docIntelAccount.properties.endpoint
+
