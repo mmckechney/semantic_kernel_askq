@@ -7,6 +7,7 @@ This solution provides an example of how to process your own documents and then 
 **NOTE**: In addition to the Azure Function deployment below, a console app is also provided to demonstrate how to use the OpenAI SDK to ask questions about the document using the same deployed AI services.
 
 ![ Architecture Diagram ](images/Architecture.png)
+
 ## What's Included
 
  This solution consists of C# function app which has 4 functions:
