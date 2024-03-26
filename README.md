@@ -1,5 +1,6 @@
 # Semantic Kernel and Azure OpenAI: Ask Questions on your document
 
+
 ## Overview
 
 This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) and [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) to ask question specific to that document.
@@ -62,13 +63,6 @@ For this example, download and use [US Declaration of Independence as a PDF file
 
    Question:
 
-      ``` json
-      {
-      "filename": "decind.pdf",
-      "question": "How many people signed this document"
-      }
-      ```
-
       Return:
 
       ``` text
@@ -128,4 +122,4 @@ If you used the `deploy.ps1` script, the console app will be compiled and starte
    ![ai set command](images/ai-set.png)
 ### What's next?
 
-Try uploading your own documents and start asking questions!
+Try uploading your own documents and start asking question
