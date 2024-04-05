@@ -20,8 +20,8 @@ namespace DocumentQuestions.Library
 
       public async Task<string> GetBlobContentAsync(string blobName)
       {
-         string connectionString = config["StorageConnectionString"] ?? throw new ArgumentException("Missing StorageConnectionString in configuration.");
-         string containerName = config["ExtractedContainerName"] ?? throw new ArgumentException("Missing ExtractedContainerName in configuration.");
+         string connectionString = config[Constants.STORAGE_CONNECTION_STRING] ?? throw new ArgumentException($"Missing {Constants.STORAGE_CONNECTION_STRING} in configuration.");
+         string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
 
 
 

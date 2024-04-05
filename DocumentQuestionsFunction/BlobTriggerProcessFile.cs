@@ -35,9 +35,9 @@ namespace DocumentQuestions.Function
          try
          {
             log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name}");
-            string subscriptionKey = config["DocumentIntelligenceSubscriptionKey"] ?? throw new ArgumentException("Missing DocumentIntelligenceSubscriptionKey in configuration.");
-            string endpoint = config["DocumentIntelligenceEndpoint"] ?? throw new ArgumentException("Missing DocumentIntelligenceEndpoint in configuration.");
-            string storageAccountName = config["StorageAccount"] ?? throw new ArgumentException("Missing StorageAccount in configuration.");
+            string subscriptionKey = config[Constants.DOCUMENTINTELLIGENCE_KEY] ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration.");
+            string endpoint = config[Constants.DOCUMENTINTELLIGENCE_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration.");
+            string storageAccountName = config[Constants.STORAGE_ACCOUNT_NAME] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_NAME} in configuration.");
             string memoryCollectionName = Path.GetFileNameWithoutExtension(name);
 
             log.LogInformation($"subkey =  {subscriptionKey}");
@@ -147,8 +147,8 @@ namespace DocumentQuestions.Function
             };
             string jsonStr = JsonConvert.SerializeObject(jsonObj);
             // Save the JSON string to Azure Blob Storage  
-            string connectionString = config["StorageConnectionString"] ?? throw new ArgumentException("Missing StorageConnectionString in configuration.");
-            string containerName = config["ExtractedContainerName"] ?? throw new ArgumentException("Missing ExtractedContainerName in configuration.");
+            string connectionString = config[Constants.STORAGE_CONNECTION_STRING] ?? throw new ArgumentException($"Missing {Constants.STORAGE_CONNECTION_STRING} in configuration.");
+            string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
 
             BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
             BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);

@@ -19,8 +19,8 @@ namespace DocumentQuestions.Library
       {
          this.log = log;
          this.config = config;
-         string endpoint = config["AiSearchEndpoint"] ?? throw new ArgumentException("Missing AiSearchEndpoint in configuration");
-         string key = config["AiSearchKey"] ?? throw new ArgumentException("Missing AiSearchKey in configuration");
+         string endpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration");
+         string key = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration");
 
          // Create a client
          AzureKeyCredential credential = new AzureKeyCredential(key);

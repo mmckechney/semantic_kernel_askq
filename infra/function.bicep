@@ -9,6 +9,8 @@ param openAIEmbeddingModel string = 'text-embedding-ada-002'
 param openAIEmbeddingDeploymentName string = 'text-embedding-ada-002'
 param location string = resourceGroup().location
 
+var constants = loadJsonContent('./constants.json')
+var kvKeys = loadJsonContent('./kvKeys.json')
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: storageAccountName
 }
@@ -67,55 +69,55 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         //   value: functionAppName
         // }
         {
-          name: 'DocumentIntelligenceSubscriptionKey'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=DocumentIntelligenceSubscriptionKey)'
+          name:  constants.DOCUMENTINTELLIGENCE_KEY
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.DOCUMENTINTELLIGENCE_KEY})'
         }
         {
-          name: 'DocumentIntelligenceEndpoint'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=DocumentIntelligenceEndpoint)'
+          name: constants.DOCUMENTINTELLIGENCE_ENDPOINT
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.DOCUMENTINTELLIGENCE_KEY})'
         }
         {
-          name: 'ContainerName'
+          name: constants.CONTAINER_NAME
           value: rawBlobContainerName
         }
         {
-          name: 'ExtractedContainerName'
+          name: constants.EXTRACTED_CONTAINER_NAME
           value: extractedBlobContainerName
         }
         {
-          name: 'OpenAIChatModel'
+          name:  constants.OPENAI_CHAT_MODEL_NAME
           value: openAIChatModel
         }
         {
-          name: 'OpenAIChatDeploymentName'
+          name: constants.OPENAI_CHAT_DEPLOYMENT_NAME
           value: openAIChatDeploymentName
         }
         {
-          name: 'OpenAIEmbeddingModel'
+          name: constants.OPENAI_EMBEDDING_MODEL_NAME
           value: openAIEmbeddingModel
         }
         {
-          name: 'OpenAIEmbeddingDeploymentName'
+          name: constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME
           value: openAIEmbeddingDeploymentName
         }
         {
-          name: 'OpenAIKey'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=OpenAIKey)'
+          name: constants.OPENAI_KEY
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.OPENAI_KEY})'
         }
         {
-          name: 'OpenAIEndpoint'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=OpenAIEndpoint)'
+          name: constants.OPENAI_ENDPOINT
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.OPENAI_ENDPOINT})'
         }
         {
-          name : 'RawStorageConnectionString'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=RawStorageConnectionString)'
+          name : constants.RAW_STORAGE_CONNECTION_STRING
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.RAW_STORAGE_CONNECTION_STRING})'
         } 
         {
-          name : 'StorageConnectionString'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=StorageConnectionString)'
+          name : constants.STORAGE_CONNECTION_STRING
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.STORAGE_CONNECTION_STRING})'
         }
         {
-          name: 'StorageAccount'
+          name: constants.STORAGE_ACCOUNT_NAME
           value: storageAccountName
         }
         {
@@ -131,12 +133,12 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: 'dotnet-isolated'
         }
         {
-          name: 'AiSearchEndpoint'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AiSearchEndpoint)'
+          name: constants.AISEARCH_ENDPOINT
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.AISEARCH_ENDPOINT})'
         }
         {
-          name: 'AiSearchKey'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AiSearchKey)'
+          name: constants.AISEARCH_KEY
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.AISEARCH_KEY})'
         }
       ]
     }

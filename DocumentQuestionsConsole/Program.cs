@@ -47,8 +47,8 @@ namespace DocumentQuestions.Console
                 {
                    var config = sp.GetRequiredService<IConfiguration>();
 
-                   var endpoint = config.GetValue<Uri>("DocumentIntelligenceEndpoint") ?? throw new ArgumentException("Missing DocumentIntelligenceEndpoint in configuration");
-                   var apiKey = config.GetValue<string>("DocumentIntelligenceSubscriptionKey") ?? throw new ArgumentException("Missing DocumentIntelligenceSubscriptionKey in configuration");
+                   var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
+                   var apiKey = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
 
                    var credentials = new AzureKeyCredential(apiKey);
 

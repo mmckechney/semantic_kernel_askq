@@ -36,15 +36,15 @@ namespace DocumentQuestions.Library
 
       public void InitMemoryAndKernel()
       {
-         var openAiChatDeploymentNAme = config["OpenAIChatDeploymentName"] ?? throw new ArgumentException("Missing OpenAIChatDeploymentName in configuration.");
-         var openAiChatModelName = config["OpenAIChatModel"] ?? throw new ArgumentException("Missing OpenAIChatModelName in configuration.");
+         var openAiChatDeploymentNAme = config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_DEPLOYMENT_NAME} in configuration.");
+         var openAiChatModelName = config[Constants.OPENAI_CHAT_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_MODEL_NAME} in configuration.");
 
-         var openAIEndpoint = config["OpenAIEndpoint"] ?? throw new ArgumentException("Missing OpenAIEndpoint in configuration.");
-         var embeddingModel = config["OpenAIEmbeddingModel"] ?? throw new ArgumentException("Missing OpenAIEmbeddingModel in configuration.");
-         var embeddingDeploymentName = config["OpenAIEmbeddingDeploymentName"] ?? throw new ArgumentException("Missing OpenAIEmbeddingDeploymentName in configuration.");
-         var apiKey = config["OpenAIKey"] ?? throw new ArgumentException("Missing OpenAIKey in configuration.");
-         var cogSearchEndpoint = config["AiSearchEndpoint"] ?? throw new ArgumentException("Missing AiSearchEndpoint in configuration.");
-         var cogSearchAdminKey = config["AiSearchKey"] ?? throw new ArgumentException("Missing AiSearchKey in configuration.");
+         var openAIEndpoint = config[Constants.OPENAI_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.OPENAI_ENDPOINT} in configuration.");
+         var embeddingModel = config[Constants.OPENAI_EMBEDDING_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_MODEL_NAME} in configuration.");
+         var embeddingDeploymentName = config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME} in configuration.");
+         var apiKey = config[Constants.OPENAI_KEY] ?? throw new ArgumentException($"Missing {Constants.OPENAI_KEY} in configuration.");
+         var cogSearchEndpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration.");
+         var cogSearchAdminKey = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration.");
 
 
          //Build and configure Memory Store

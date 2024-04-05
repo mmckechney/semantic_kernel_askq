@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using DocumentQuestions.Library;
 using HttpMultipartParser;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -28,8 +30,8 @@ namespace DocumentQuestions.Function
       {
          try
          {
-            string connectionString = config["RawStorageConnectionString"] ?? throw new ArgumentException("Missing RawStorageConnectionString in configuration.");
-            string containerName = config["ContainerName"] ?? throw new ArgumentException("Missing ContainerName in configuration.");
+            string connectionString = config[Constants.RAW_STORAGE_CONNECTION_STRING] ?? throw new ArgumentException($"Missing {Constants.RAW_STORAGE_CONNECTION_STRING} in configuration.");
+            string containerName = config[Constants.CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.CONTAINER_NAME} in configuration.");
             var serviceClient = new BlobServiceClient(connectionString);
             var containerClient = serviceClient.GetBlobContainerClient(containerName);
             var multipart = await MultipartFormDataParser.ParseAsync(req.Body);

@@ -53,21 +53,21 @@ $aiSearchKey = az search admin-key show --resource-group $resourceGroupName  --s
 $docIntelligenceKey = az cognitiveservices account keys list --name $docIntelligenceAccountName --resource-group $resourceGroupName -o tsv --query key1
 
 
-
+$json = Get-Content 'infra/constants.json' | ConvertFrom-Json
 $appSettings = @{
-        "OpenAIEndpoint" = $openAiEndpoint
-        "OpenAIKey"= $openAiKey
-        "OpenAIChatModel"= $openAIChatModel
-        "OpenAIChatDeploymentName" = $openAIChatDeploymentName
+        "$($json.OPENAI_ENDPOINT)" = $openAiEndpoint
+        "$($json.OPENAI_KEY)"= $openAiKey
+        "$($json.OPENAI_CHAT_MODEL_NAME)"= $openAIChatModel
+        "$($json.OPENAI_CHAT_DEPLOYMENT_NAME)" = $openAIChatDeploymentName
      
-        "OpenAIEmbeddingModel" = $openAIEmbeddingModel 
-        "OpenAIEmbeddingDeploymentName" = $openAIEmbeddingDeploymentName
+        "$($json.OPENAI_EMBEDDING_MODEL_NAME)" = $openAIEmbeddingModel 
+        "$($json.OPENAI_EMBEDDING_DEPLOYMENT_NAME)" = $openAIEmbeddingDeploymentName
 
-        "DocumentIntelligenceSubscriptionKey" = $docIntelligenceKey
-        "DocumentIntelligenceEndpoint" = "https://$($result.location).api.cognitive.microsoft.com/"
+        "$($json.DOCUMENTINTELLIGENCE_KEY)" = $docIntelligenceKey
+        "$($json.DOCUMENTINTELLIGENCE_ENDPOINT)" = "https://$($result.location).api.cognitive.microsoft.com/"
      
-        "AiSearchEndpoint"=   "https://$($aiSearchName).search.windows.net"
-        "AiSearchKey" = $aiSearchKey
+        "$($json.AISEARCH_ENDPOINT)"=   "https://$($aiSearchName).search.windows.net"
+        "$($json.AISEARCH_KEY)" = $aiSearchKey
         "UseOpenAIKey" = $true
 }
 
