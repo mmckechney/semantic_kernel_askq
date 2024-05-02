@@ -1,16 +1,11 @@
-﻿using Microsoft.Extensions.Hosting;
-using s= System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using DocumentQuestions.Library;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.CommandLine.Parsing;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using DocumentQuestions.Library;
-using System.CommandLine.Parsing;
-using Microsoft.SemanticKernel.Connectors.AzureAISearch;
-using Json.Schema.Generation.Intents;
+using s = System;
 
 namespace DocumentQuestions.Console
 {
