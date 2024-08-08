@@ -17,14 +17,14 @@
       <PackageReference Include="Azure.Search.Documents" Version="11.6.0" />
       <PackageReference Include="Azure.Storage.Blobs" Version="12.21.1" />
       <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-      <PackageReference Include="Microsoft.SemanticKernel" Version="1.16.2" />
-      <PackageReference Include="Microsoft.SemanticKernel.Abstractions" Version="1.16.2" />
-      <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureAISearch" Version="1.16.2-alpha" />
-      <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.16.2-alpha" />
-      <PackageReference Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" Version="1.16.2" />
-      <PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.16.2" />
+      <PackageReference Include="Microsoft.SemanticKernel" Version="1.17.1" />
+      <PackageReference Include="Microsoft.SemanticKernel.Abstractions" Version="1.17.1" />
+      <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureAISearch" Version="1.17.1-alpha" />
+      <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.17.1-alpha" />
+      <PackageReference Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" Version="1.17.1" />
+      <PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.17.1" />
 
-      <PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.16.2" />
+      <PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.17.1" />
 
    </ItemGroup>
    
