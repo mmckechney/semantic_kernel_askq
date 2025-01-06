@@ -1,8 +1,11 @@
-﻿using Azure.Storage.Blobs;
+﻿using Azure.Core;
+using Azure.Identity;
+using Azure.Storage.Blobs;
 using DocumentQuestions.Library.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace DocumentQuestions.Library
 {
@@ -16,16 +19,39 @@ namespace DocumentQuestions.Library
          this.config = config;
       }
 
+      private static TokenCredential _tokenCred = null;
+      public static TokenCredential EntraTokenCredential
+      {
+         get
+         {
+            if(_tokenCred == null)
+            {
+               _tokenCred = new ChainedTokenCredential(new ManagedIdentityCredential(), new AzureCliCredential());
+            }
+            return _tokenCred;
 
+         }
+      }
+      public static string ReplaceInvalidCharacters(string input)
+      {
+         input = Path.GetFileNameWithoutExtension(input).ToLower();
+         // Replace any characters that are not letters, digits, or dashes with a dash
+         string result = Regex.Replace(input, @"[^a-zA-Z0-9-]", "-");
+
+         // Remove any trailing dashes
+         result = Regex.Replace(result, @"-+$", "");
+         if (result.Length > 128) result = result.Substring(0, 128);
+         return result;
+      }
 
       public async Task<string> GetBlobContentAsync(string blobName)
       {
-         string connectionString = config[Constants.STORAGE_CONNECTION_STRING] ?? throw new ArgumentException($"Missing {Constants.STORAGE_CONNECTION_STRING} in configuration.");
+         string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
          string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
 
 
 
-         BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+         BlobServiceClient blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
          BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
          var blobs = containerClient.GetBlobs(prefix: blobName);
@@ -56,12 +82,12 @@ namespace DocumentQuestions.Library
 
       public async Task<Dictionary<string, string>> GetBlobContentDictionaryAsync(string blobName)
       {
-         string connectionString = Environment.GetEnvironmentVariable("StorageConnectionString") ?? "DefaultConnection";
-         string containerName = Environment.GetEnvironmentVariable("ExtractedContainerName") ?? "DefaultContainer";
+         string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
+         string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
 
 
 
-         BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+         BlobServiceClient blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
          BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
          var blobs = containerClient.GetBlobs(prefix: blobName);

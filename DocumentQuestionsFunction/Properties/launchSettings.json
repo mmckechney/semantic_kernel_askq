@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "DocumentQuestionsFunction": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ReadOnlyDataProtectionKeyDirectory": "disable"
+      }
+    }
+  }
+}

@@ -11,8 +11,11 @@ param docIntelligenceAccountName string
 param aiSearchName string
 param openAiEndpoint string
 param openAiKey string
-param openAIChatModel string = 'gpt-4'
-param openAIEmbeddingModel string = 'text-embedding-ada-002'
+param currentUserObjectId string
+param openAIChatModel string
+param openAIChatDeploymentName string
+param openAIEmbeddingDeploymentName string
+param openAIEmbeddingModel string
 
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
@@ -53,8 +56,8 @@ module docIntelligence 'docintelligence.bicep' = {
     scope: resourceGroup(resourceGroupName)
     params: {
         docIntelAccountName: docIntelligenceAccountName
-        keyVaultName: keyVaultName
         location: location
+        keyVaultName: keyVaultName
     }
     dependsOn: [
         rg
@@ -66,7 +69,6 @@ module storageResources 'storage.bicep' = {
     scope: resourceGroup(resourceGroupName)
     params: {
         storageAccountName: storageAccountName
-        keyVaultName: keyVaultName
         location: location
     }
     dependsOn: [
@@ -82,15 +84,18 @@ module functionResources 'function.bicep' = {
         functionAppName: functionAppName
         location: location
         openAIChatModel: openAIChatModel
+        openAIChatDeploymentName: openAIChatDeploymentName
         openAIEmbeddingModel: openAIEmbeddingModel
+        openAIEmbeddingDeploymentName: openAIEmbeddingDeploymentName
         storageAccountName: storageAccountName
         extractedBlobContainerName: storageResources.outputs.extractedContainerName
         rawBlobContainerName: storageResources.outputs.rawContainerName
         keyVaultName: keyVaultName
+        aiSearchEndpoint : aiSearch.outputs.aiSearchEndpoint
+        docIntelligenceEndpoint : docIntelligence.outputs.docIntelEndpoint
     }
     dependsOn: [
         rg
-        storageResources
     ]
 }
 
@@ -98,18 +103,14 @@ module roleAssignments 'roleassignments.bicep' = {
     name: 'roleAssignments'
     scope: resourceGroup(resourceGroupName)
     params: {
-        functionAppName: functionAppName
-        cognitiveServicesAccountName: docIntelligenceAccountName
+  
         cogSvcsPrincipalId: docIntelligence.outputs.docIntelPrincipalId
-        extractedBlobContainerName: storageResources.outputs.extractedContainerName
-        rawBlobContainerName: storageResources.outputs.rawContainerName
         functionPrincipalId: functionResources.outputs.functionAppId
-        storageAccountName: storageAccountName
+        currentUserObjectId : currentUserObjectId
+
     }
     dependsOn: [
         rg
-        functionResources
-        storageResources
     ]
 }
 
@@ -121,9 +122,17 @@ resource func_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-
         roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAiUserRole)
         principalId: functionAppId
     }
-    dependsOn: [
-        functionResources
-    ]
+}
+
+resource user_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+    name: guid(currentUserObjectId, openAiUserRole, subscription().id)
+    properties: {
+        roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAiUserRole)
+        principalId: currentUserObjectId
+    }
 }
 
 output docIntelEndpoint string = docIntelligence.outputs.docIntelEndpoint
+output extractedContainerName string = storageResources.outputs.extractedContainerName
+output rawContainerName string = storageResources.outputs.rawContainerName
+

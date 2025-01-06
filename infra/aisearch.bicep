@@ -1,15 +1,22 @@
 ﻿param aiSearchName string
-param keyVaultName string
 param location string = resourceGroup().location
-
-
-
+param keyVaultName string
+var kvKeys = loadJsonContent('./kvKeys.json')
 resource aiSearchInstance 'Microsoft.Search/searchServices@2023-11-01' = {
   name: aiSearchName
   location: location
   sku: {
     name: 'basic'
   }
+   properties: {
+      hostingMode: 'default'
+      disableLocalAuth: false
+      authOptions: {
+          aadOrApiKey: {
+              
+          }
+      }
+    }
 }
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
@@ -18,16 +25,10 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
 
 resource adminKey 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
   parent: keyVault
-  name: 'AiSearchKey'
+  name: kvKeys.AISEARCH_KEY
   properties: {
     value:  aiSearchInstance.listAdminKeys().primaryKey
   }
 }
 
-resource endPoint 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
-  parent: keyVault
-  name: 'AiSearchEndpoint'
-  properties: {
-    value: 'https://${aiSearchName}.search.windows.net'
-  }
-}
+output aiSearchEndpoint string = 'https://${aiSearchInstance.name}.search.windows.net'

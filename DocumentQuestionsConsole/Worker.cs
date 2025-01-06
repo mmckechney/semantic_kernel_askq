@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using System.CommandLine.Parsing;
 using System.Reflection;
 using System.Text;
-using s = System;
+using syS = System;
 
 namespace DocumentQuestions.Console
 {
@@ -14,7 +14,7 @@ namespace DocumentQuestions.Console
       private static ILogger<Worker> log;
       private static ILoggerFactory logFactory;
       private static IConfiguration config;
-      private static StartArgs startArgs;
+      private static StartArgs? startArgs;
       private static SemanticUtility semanticUtility;
       private static Common common;
       private static Parser rootParser;
@@ -45,7 +45,7 @@ namespace DocumentQuestions.Console
             return;
          }
          string quest = string.Join(" ", question);
-         s.Console.WriteLine("----------------------");
+         syS.Console.WriteLine("----------------------");
          var docContent = await  semanticUtility.SearchForReleventContent(activeDocument, quest);
          if (string.IsNullOrWhiteSpace(docContent))
          {
@@ -55,13 +55,13 @@ namespace DocumentQuestions.Console
          {
             await foreach (var bit in semanticUtility.AskQuestionStreaming(quest, docContent))
             {
-               s.Console.Write(bit);
+               syS.Console.Write(bit);
             }
          }
 
-         s.Console.WriteLine();
-         s.Console.WriteLine("----------------------");
-         s.Console.WriteLine();
+         syS.Console.WriteLine();
+         syS.Console.WriteLine("----------------------");
+         syS.Console.WriteLine();
       }
 
       internal static async void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
@@ -167,7 +167,7 @@ namespace DocumentQuestions.Console
          while (true)
          {
             sb = new StringBuilder();
-            s.Console.WriteLine();
+            syS.Console.WriteLine();
             if (firstPass && string.IsNullOrWhiteSpace(activeDocument))
             {
                fileCount = await rootParser.InvokeAsync("list");
@@ -193,8 +193,8 @@ namespace DocumentQuestions.Console
             }
 
            
-            s.Console.Write("dq> ");
-            var line = s.Console.ReadLine();
+            syS.Console.Write("dq> ");
+            var line = syS.Console.ReadLine();
             if (line == null)
             {
                return;
