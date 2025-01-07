@@ -65,10 +65,6 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
           value: storageAccountConnection
         }
-        // {
-        //   name: 'WEBSITE_CONTENTSHARE'
-        //   value: functionAppName
-        // }
         {
           name:  constants.DOCUMENTINTELLIGENCE_KEY
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.DOCUMENTINTELLIGENCE_KEY})'
@@ -78,7 +74,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: docIntelligenceEndpoint
         }
         {
-          name: constants.CONTAINER_NAME
+          name: constants.RAW_CONTAINER_NAME
           value: rawBlobContainerName
         }
         {

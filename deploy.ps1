@@ -19,24 +19,29 @@ $docIntelligenceAccountName = $functionAppName + "-aidoc"
 $aiSearchName = $functionAppName.ToLower() + "-aisearch"
 $keyVaultName = $functionAppName + "-keyvault"
 
+
+Write-Host "Getting current user object id" -ForegroundColor DarkCyan
+$currentUserObjectId = az ad signed-in-user show -o tsv --query id
+Write-Host "Current User Object Id: $currentUserObjectId" -ForegroundColor Green
+
+Write-Host "Creating Resource Group $resourceGroupName" -ForegroundColor Green
+Write-Host "Location: $location" -ForegroundColor Green
+Write-Host "Function App Name: $functionAppName" -ForegroundColor Green
+Write-Host "Storage Account Name: $storageAccountName" -ForegroundColor Green
+Write-Host "Document Intelligence AI Services Account Name: $docIntelligenceAccountName" -ForegroundColor Green
+Write-Host "AI Search Account Name: $aiSearchName" -ForegroundColor Green
+Write-Host "Azure OpenAI chat model: $openAIChatModel" -ForegroundColor Green
+Write-Host "Azure OpenAI chat deployment name: $openAIChatDeploymentName" -ForegroundColor Green
+Write-Host "Azure OpenAI embedding model: $openAIEmbeddingModel" -ForegroundColor Green
+Write-Host "Azure OpenAI embedding deployment name: $openAIEmbeddingDeploymentName" -ForegroundColor Green
+Write-Host "Azure Open AI Endpoint: $openAiEndpoint" -ForegroundColor Green
 if($localCodeOnly -eq $true)
 {
-   Write-Host "Getting current user object id" -ForegroundColor DarkCyan
-   $currentUserObjectId = az ad signed-in-user show -o tsv --query id
-   Write-Host "Current User Object Id: $currentUserObjectId" -ForegroundColor Green
-
-   Write-Host "Creating Resource Group $resourceGroupName" -ForegroundColor Green
-   Write-Host "Location: $location" -ForegroundColor Green
-   Write-Host "Function App Name: $functionAppName" -ForegroundColor Green
-   Write-Host "Storage Account Name: $storageAccountName" -ForegroundColor Green
-   Write-Host "Document Intelligence AI Services Account Name: $docIntelligenceAccountName" -ForegroundColor Green
-   Write-Host "AI Search Account Name: $aiSearchName" -ForegroundColor Green
-   Write-Host "Azure OpenAI chat model: $openAIChatModel" -ForegroundColor Green
-   Write-Host "Azure OpenAI chat deployment name: $openAIChatDeploymentName" -ForegroundColor Green
-   Write-Host "Azure OpenAI embedding model: $openAIEmbeddingModel" -ForegroundColor Green
-   Write-Host "Azure OpenAI embedding deployment name: $openAIEmbeddingDeploymentName" -ForegroundColor Green
-   Write-Host "Azure Open AI Endpoint: $openAiEndpoint" -ForegroundColor Green
-
+    Write-Host "Local code only, skipping Azure Bicep Deployment" -ForegroundColor DarkCyan
+}
+else
+{
+   Write-Host "Running Azure Bicep Deployment..." -ForegroundColor DarkCyan
    $result =  az deployment sub create --name $functionAppName --location $location  --template-file ./infra/main.bicep `
        --parameters resourceGroupName=$resourceGroupName location=$location `
        functionAppName=$functionAppName storageAccountName=$storageAccountName `
@@ -83,7 +88,7 @@ $appSettings = @{
         "$($json.STORAGE_ACCOUNT_QUEUE_URL.Replace("__", ":"))" = "https://$($storageAccountName).queue.core.windows.net/"
         "$($json.STORAGE_ACCOUNT_NAME)" = $storageAccountName
         "$($json.EXTRACTED_CONTAINER_NAME)" = "extracted"
-        "$($json.CONTAINER_NAME)" = "raw"
+        "$($json.RAW_CONTAINER_NAME)" = "raw"
         
         "UseOpenAIKey" = $true
 }
@@ -121,7 +126,7 @@ $funcSettings = @{
         "$($json.STORAGE_ACCOUNT_QUEUE_URL.Replace("__", ":"))" = "https://$($storageAccountName).queue.core.windows.net/"
         "$($json.STORAGE_ACCOUNT_NAME)" = $storageAccountName
         "$($json.EXTRACTED_CONTAINER_NAME)" = "extracted"
-        "$($json.CONTAINER_NAME)" = "raw"
+        "$($json.RAW_CONTAINER_NAME)" = "raw"
 
         "UseOpenAIKey" = $true
     }

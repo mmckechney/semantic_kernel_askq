@@ -26,6 +26,6 @@ namespace DocumentQuestions.Library
 
       public const string EXTRACTED_CONTAINER_NAME = "EXTRACTED_CONTAINER_NAME";
 
-      public const string CONTAINER_NAME = "CONTAINER_NAME";
+      public const string RAW_CONTAINER_NAME = "RAW_CONTAINER_NAME";
    }
 }

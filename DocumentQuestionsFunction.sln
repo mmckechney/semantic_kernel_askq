@@ -17,17 +17,17 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentQuestionsLibrary", "DocumentQuestionsLibrary\DocumentQuestionsLibrary.csproj", "{29F0F675-C21F-47C3-B99A-4BFDE8D69B20}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Infra", "Infra", "{8F6FAAC3-CC8C-43A1-8048-1388607073DF}"
-	ProjectSection(SolutionItems) = preProject
-		infra\aisearch.bicep = infra\aisearch.bicep
-		infra\constants.json = infra\constants.json
-		infra\docintelligence.bicep = infra\docintelligence.bicep
-		infra\function.bicep = infra\function.bicep
-		infra\keyvault.bicep = infra\keyvault.bicep
-		infra\kvKeys.json = infra\kvKeys.json
-		infra\main.bicep = infra\main.bicep
-		infra\roleassignments.bicep = infra\roleassignments.bicep
-		infra\storage.bicep = infra\storage.bicep
-	EndProjectSection
+ProjectSection(SolutionItems) = preProject
+	infra\aisearch.bicep = infra\aisearch.bicep
+	infra\constants.json = infra\constants.json
+	infra\docintelligence.bicep = infra\docintelligence.bicep
+	infra\function.bicep = infra\function.bicep
+	infra\keyvault.bicep = infra\keyvault.bicep
+	infra\kvKeys.json = infra\kvKeys.json
+	infra\main.bicep = infra\main.bicep
+	infra\roleassignments.bicep = infra\roleassignments.bicep
+	infra\storage.bicep = infra\storage.bicep
+EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

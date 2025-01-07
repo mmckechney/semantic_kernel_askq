@@ -32,7 +32,7 @@ namespace DocumentQuestions.Function
          try
          {
             string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
-            string containerName = config[Constants.CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.CONTAINER_NAME} in configuration.");
+            string containerName = config[Constants.RAW_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.RAW_CONTAINER_NAME} in configuration.");
             var blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
 
             var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
