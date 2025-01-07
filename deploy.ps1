@@ -101,7 +101,7 @@ $appSettings = @{
  if(!$?){ exit }
 
 Push-Location -Path .\DocumentQuestionsFunction\
-Write-Host "Creating functin app local.settings.json" -ForegroundColor Green
+Write-Host "Creating function app local.settings.json" -ForegroundColor Green
 $funcSettings = @{
     "IsEncrypted" = $false
     Values = @{
