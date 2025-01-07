@@ -58,12 +58,20 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
       netFrameworkVersion: 'v8.0'
       appSettings: [
         {
-          name: 'AzureWebJobsStorage'
-          value: storageAccountConnection
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccountName
+        }
+        {
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'
         }
         {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
           value: storageAccountConnection
+        }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: '${toLower(functionAppName)}fileshare'
         }
         {
           name:  constants.DOCUMENTINTELLIGENCE_KEY
