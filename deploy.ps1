@@ -139,6 +139,6 @@ $funcSettings = @{
 Push-Location -Path .\DocumentQuestionsConsole\
 Write-Host "Building Connsole App" -ForegroundColor Green
 dotnet build . -c debug -warnaserror none
+dotnet run --no-build -- -h
 Pop-Location
 
-.\DocumentQuestionsConsole\bin\Debug\net8.0\dq.exe
