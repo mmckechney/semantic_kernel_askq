@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using DocumentQuestions.Library.Models;
+using Azure.Identity;
 namespace DocumentQuestions.Function
 {
    public class BlobTriggerProcessFile
@@ -30,7 +31,7 @@ namespace DocumentQuestions.Function
       }
 
       [Function("BlobTriggerProcessFile")]
-      public async Task RunAsync([BlobTrigger("raw/{name}", Connection = "StorageConnectionString")] Stream myBlob, string name)
+      public async Task RunAsync([BlobTrigger("raw/{name}", Connection = "STORAGE_ACCOUNT_BLOB_URL")] Stream myBlob, string name)
       {
          try
          {
@@ -146,11 +147,12 @@ namespace DocumentQuestions.Function
                Content = content
             };
             string jsonStr = JsonConvert.SerializeObject(jsonObj);
+
             // Save the JSON string to Azure Blob Storage  
-            string connectionString = config[Constants.STORAGE_CONNECTION_STRING] ?? throw new ArgumentException($"Missing {Constants.STORAGE_CONNECTION_STRING} in configuration.");
+            string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
             string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
 
-            BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+            var blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
             BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
             containerClient.CreateIfNotExists();
 

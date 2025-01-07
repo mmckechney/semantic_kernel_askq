@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
-using s = System;
+using syS = System;
 namespace DocumentQuestions.Console
 {
 
@@ -21,45 +21,45 @@ namespace DocumentQuestions.Console
 
          if (logEntry.LogLevel != LogLevel.Information)
          {
-            s.Console.Write("[");
-            s.Console.ForegroundColor = color;
-            s.Console.Write($"{level}");
-            s.Console.ResetColor();
-            s.Console.Write("] ");
+            syS.Console.Write("[");
+            syS.Console.ForegroundColor = color;
+            syS.Console.Write($"{level}");
+            syS.Console.ResetColor();
+            syS.Console.Write("] ");
          }
          foreach (var msg in messages)
          {
-            (s.Console.ForegroundColor, parsedMessage) = GetLogEntryColor(msg);
-            s.Console.Write($"{parsedMessage} ");
-            s.Console.ResetColor();
+            (syS.Console.ForegroundColor, parsedMessage) = GetLogEntryColor(msg);
+            syS.Console.Write($"{parsedMessage} ");
+            syS.Console.ResetColor();
          }
-         s.Console.WriteLine();
+         syS.Console.WriteLine();
 
       }
-      private (s.ConsoleColor, string) LogLevelShort(LogLevel level)
+      private (syS.ConsoleColor, string) LogLevelShort(LogLevel level)
       {
          switch (level)
          {
             case LogLevel.Trace:
-               return (s.ConsoleColor.Blue, "TRC");
+               return (syS.ConsoleColor.Blue, "TRC");
             case LogLevel.Debug:
-               return (s.ConsoleColor.Blue, "DBG");
+               return (syS.ConsoleColor.Blue, "DBG");
             case LogLevel.Information:
-               return (s.ConsoleColor.White, "INF");
+               return (syS.ConsoleColor.White, "INF");
             case LogLevel.Warning:
-               return (s.ConsoleColor.DarkYellow, "WRN");
+               return (syS.ConsoleColor.DarkYellow, "WRN");
             case LogLevel.Error:
-               return (s.ConsoleColor.Red, "ERR");
+               return (syS.ConsoleColor.Red, "ERR");
             case LogLevel.Critical:
-               return (s.ConsoleColor.DarkRed, "CRT");
+               return (syS.ConsoleColor.DarkRed, "CRT");
             default:
-               return (s.ConsoleColor.Cyan, "UNK");
+               return (syS.ConsoleColor.Cyan, "UNK");
 
          }
       }
-      public (s.ConsoleColor color, string message) GetLogEntryColor(string message)
+      public (syS.ConsoleColor color, string message) GetLogEntryColor(string message)
       {
-         var color = s.ConsoleColor.White;
+         var color = syS.ConsoleColor.White;
          if (message.Contains("**COLOR:"))
          {
             var colorString = message.Split("**COLOR:")[1];
@@ -74,66 +74,66 @@ namespace DocumentQuestions.Console
    }
    public static class ILoggerExtensions
    {
-      public static void LogInformation(this ILogger logger, string message, s.ConsoleColor color)
+      public static void LogInformation(this ILogger logger, string message, syS.ConsoleColor color)
       {
          logger.LogInformation(FormatMessage(message, color));
       }
 
-      public static void LogDebug(this ILogger logger, string message, s.ConsoleColor color)
+      public static void LogDebug(this ILogger logger, string message, syS.ConsoleColor color)
       {
          logger.LogDebug(FormatMessage(message, color));
       }
 
-      public static void LogError(this ILogger logger, string message, s.ConsoleColor color)
+      public static void LogError(this ILogger logger, string message, syS.ConsoleColor color)
       {
          logger.LogError(FormatMessage(message, color));
       }
 
-      public static void LogWarning(this ILogger logger, string message, s.ConsoleColor color)
+      public static void LogWarning(this ILogger logger, string message, syS.ConsoleColor color)
       {
          logger.LogWarning(FormatMessage(message, color));
       }
 
-      public static void LogCritical(this ILogger logger, string message, s.ConsoleColor color)
+      public static void LogCritical(this ILogger logger, string message, syS.ConsoleColor color)
       {
          logger.LogCritical(FormatMessage(message, color));
       }
 
-      public static void LogTrace(this ILogger logger, string message, s.ConsoleColor color)
+      public static void LogTrace(this ILogger logger, string message, syS.ConsoleColor color)
       {
          logger.LogTrace(FormatMessage(message,color));
       }
 
-      public static void LogInformation(this ILogger logger, Dictionary<string,s.ConsoleColor> messages)
+      public static void LogInformation(this ILogger logger, Dictionary<string,syS.ConsoleColor> messages)
       {
          logger.LogInformation(FormatMessages(messages));
       }
 
-      public static void LogDebug(this ILogger logger, Dictionary<string, s.ConsoleColor> messages)
+      public static void LogDebug(this ILogger logger, Dictionary<string, syS.ConsoleColor> messages)
       {
          logger.LogDebug(FormatMessages(messages));
       }
 
-      public static void LogError(this ILogger logger, Dictionary<string, s.ConsoleColor> messages)
+      public static void LogError(this ILogger logger, Dictionary<string, syS.ConsoleColor> messages)
       {
          logger.LogError(FormatMessages(messages));
       }
 
-      public static void LogWarning(this ILogger logger, Dictionary<string, s.ConsoleColor> messages)
+      public static void LogWarning(this ILogger logger, Dictionary<string, syS.ConsoleColor> messages)
       {
          logger.LogWarning(FormatMessages(messages));
       }
 
-      public static void LogCritical(this ILogger logger, Dictionary<string, s.ConsoleColor> messages)
+      public static void LogCritical(this ILogger logger, Dictionary<string, syS.ConsoleColor> messages)
       {
          logger.LogCritical(FormatMessages(messages));
       }
 
-      public static void LogTrace(this ILogger logger, Dictionary<string, s.ConsoleColor> messages)
+      public static void LogTrace(this ILogger logger, Dictionary<string, syS.ConsoleColor> messages)
       {
          logger.LogTrace(FormatMessages(messages));
       }
-      private static string FormatMessages(Dictionary<string, s.ConsoleColor> messages)
+      private static string FormatMessages(Dictionary<string, syS.ConsoleColor> messages)
       {
          var formattedMessages = string.Empty;
          foreach (var message in messages)
@@ -142,7 +142,7 @@ namespace DocumentQuestions.Console
          }
          return formattedMessages;
       }
-      private static string FormatMessage(string message, s.ConsoleColor color)
+      private static string FormatMessage(string message, syS.ConsoleColor color)
       {
          return message + " **COLOR:" + color.ToString();
       }

@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Azure;
+using Azure.Core;
+using Azure.Identity;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Indexes;
 using Microsoft.Extensions.Configuration;
@@ -21,19 +23,25 @@ namespace DocumentQuestions.Library
          this.config = config;
          string endpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration");
          string key = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration");
-
          // Create a client
-         AzureKeyCredential credential = new AzureKeyCredential(key);
-         client = new SearchIndexClient(new Uri(endpoint), credential);
+         //client = new SearchIndexClient(new Uri(endpoint), new DefaultAzureCredential());
+         client = new SearchIndexClient(new Uri(endpoint), new AzureKeyCredential(key));
       }
       public async Task<List<string>> ListAvailableIndexes()
       {
-         List<string> names = new();
-        await foreach(var page in client.GetIndexNamesAsync())
+         try
+         {
+            List<string> names = new();
+            await foreach (var page in client.GetIndexNamesAsync())
             {
-            names.Add($"\"{page}\"");
+               names.Add($"\"{page}\"");
+            }
+            return names;
+         }catch(Exception exe)
+         {
+            log.LogError($"Problem retrieving AI Search Idexes:\r\n{exe.Message}");
+            return new List<string>();
          }
-         return names;
       }
    }
 }

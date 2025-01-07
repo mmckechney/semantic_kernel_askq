@@ -3,21 +3,22 @@ param storageAccountName string
 param keyVaultName string
 param rawBlobContainerName string
 param extractedBlobContainerName string
-param openAIChatModel string = 'gpt-4-32k'
-param openAIChatDeploymentName string = 'gpt-4-32k'
-param openAIEmbeddingModel string = 'text-embedding-ada-002'
-param openAIEmbeddingDeploymentName string = 'text-embedding-ada-002'
+param openAIChatModel string
+param openAIChatDeploymentName string 
+param openAIEmbeddingModel string
+param openAIEmbeddingDeploymentName string 
 param location string = resourceGroup().location
+param docIntelligenceEndpoint string
+param aiSearchEndpoint string
 
 var constants = loadJsonContent('./constants.json')
 var kvKeys = loadJsonContent('./kvKeys.json')
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: storageAccountName
 }
 
-
 var storageAccountConnection = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
-
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2021-01-15' = {
   name: '${functionAppName}-asp'
@@ -57,27 +58,31 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
       netFrameworkVersion: 'v8.0'
       appSettings: [
         {
-          name: 'AzureWebJobsStorage'
-          value: storageAccountConnection
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccountName
+        }
+        {
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'
         }
         {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
           value: storageAccountConnection
         }
-        // {
-        //   name: 'WEBSITE_CONTENTSHARE'
-        //   value: functionAppName
-        // }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: '${toLower(functionAppName)}fileshare'
+        }
         {
           name:  constants.DOCUMENTINTELLIGENCE_KEY
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.DOCUMENTINTELLIGENCE_KEY})'
         }
         {
           name: constants.DOCUMENTINTELLIGENCE_ENDPOINT
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.DOCUMENTINTELLIGENCE_KEY})'
+          value: docIntelligenceEndpoint
         }
         {
-          name: constants.CONTAINER_NAME
+          name: constants.RAW_CONTAINER_NAME
           value: rawBlobContainerName
         }
         {
@@ -109,12 +114,12 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.OPENAI_ENDPOINT})'
         }
         {
-          name : constants.RAW_STORAGE_CONNECTION_STRING
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.RAW_STORAGE_CONNECTION_STRING})'
-        } 
+           name: constants.STORAGE_ACCOUNT_BLOB_URL
+           value: storageAccount.properties.primaryEndpoints.blob
+        }
         {
-          name : constants.STORAGE_CONNECTION_STRING
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.STORAGE_CONNECTION_STRING})'
+           name: constants.STORAGE_ACCOUNT_QUEUE_URL
+           value: storageAccount.properties.primaryEndpoints.queue
         }
         {
           name: constants.STORAGE_ACCOUNT_NAME
@@ -134,12 +139,13 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         }
         {
           name: constants.AISEARCH_ENDPOINT
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.AISEARCH_ENDPOINT})'
+          value: aiSearchEndpoint
         }
-        {
+         {
           name: constants.AISEARCH_KEY
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${kvKeys.AISEARCH_KEY})'
         }
+       
       ]
     }
   }

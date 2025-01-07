@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using DocumentQuestions.Library;
 using HttpMultipartParser;
@@ -30,10 +31,11 @@ namespace DocumentQuestions.Function
       {
          try
          {
-            string connectionString = config[Constants.RAW_STORAGE_CONNECTION_STRING] ?? throw new ArgumentException($"Missing {Constants.RAW_STORAGE_CONNECTION_STRING} in configuration.");
-            string containerName = config[Constants.CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.CONTAINER_NAME} in configuration.");
-            var serviceClient = new BlobServiceClient(connectionString);
-            var containerClient = serviceClient.GetBlobContainerClient(containerName);
+            string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
+            string containerName = config[Constants.RAW_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.RAW_CONTAINER_NAME} in configuration.");
+            var blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
             var multipart = await MultipartFormDataParser.ParseAsync(req.Body);
 
             if (multipart.Files.First() == null)
@@ -41,15 +43,12 @@ namespace DocumentQuestions.Function
                var badResp = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                badResp.Body = new MemoryStream(Encoding.UTF8.GetBytes("Missing File Data"));
                return badResp;
-
             }
             var fileContent = multipart.Files.First().Data;
             var fileName = multipart.Files.First().FileName;
 
-            var blobClient = new BlobContainerClient(connectionString, containerName);
-            var blob = blobClient.GetBlobClient(fileName);
+            var blob = containerClient.GetBlobClient(fileName);
             await blob.UploadAsync(fileContent);
-
 
             var resp = req.CreateResponse(System.Net.HttpStatusCode.OK);
             resp.Body = new MemoryStream(Encoding.UTF8.GetBytes(fileName + " - " + fileContent.Length.ToString() + " bytes"));

@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Azure;
+using Azure.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -44,19 +46,17 @@ namespace DocumentQuestions.Library
          var embeddingModel = config[Constants.OPENAI_EMBEDDING_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_MODEL_NAME} in configuration.");
          var embeddingDeploymentName = config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME} in configuration.");
          var apiKey = config[Constants.OPENAI_KEY] ?? throw new ArgumentException($"Missing {Constants.OPENAI_KEY} in configuration.");
-         var cogSearchEndpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration.");
-         var cogSearchAdminKey = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration.");
-
+         var aiSearchEndpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration.");
+         var aiSearchKey = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration.");
 
          //Build and configure Memory Store
-         IMemoryStore store = new AzureAISearchMemoryStore(cogSearchEndpoint, cogSearchAdminKey);
-         
-
+         //IMemoryStore store = new AzureAISearchMemoryStore(aiSearchEndpoint, new DefaultAzureCredential());
+         IMemoryStore store = new AzureAISearchMemoryStore(aiSearchEndpoint, aiSearchKey);
 
          var memBuilder = new MemoryBuilder()
              .WithMemoryStore(store)
-             .WithTextEmbeddingGeneration(new AzureOpenAITextEmbeddingGenerationService(deploymentName: embeddingDeploymentName, modelId: embeddingModel, endpoint: openAIEndpoint, apiKey: apiKey))
-             .WithLoggerFactory(logFactory);
+             .WithTextEmbeddingGeneration(new AzureOpenAITextEmbeddingGenerationService(deploymentName: embeddingDeploymentName, modelId: embeddingModel, endpoint: openAIEndpoint, apiKey: apiKey));
+             //.WithLoggerFactory(logFactory);
 
          semanticMemory = memBuilder.Build();
 
@@ -106,6 +106,7 @@ namespace DocumentQuestions.Library
   
       public async Task StoreMemoryAsync(string collectionName, Dictionary<string, string> docFile)
       {
+         collectionName = Common.ReplaceInvalidCharacters(collectionName);
          log.LogInformation($"Storing memory to AI Search collection '{collectionName}'...");
          var i = 0;
          foreach (var entry in docFile)

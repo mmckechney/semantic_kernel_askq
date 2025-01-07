@@ -8,14 +8,15 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace DocumentQuestions.Library
 {
-  
+
    public class DocumentIntelligence
    {
       private DocumentAnalysisClient documentAnalysisClient;
-      private ILoggerFactory logFactory;
+      //private ILoggerFactory logFactory;
       private ILogger<DocumentIntelligence> log;
       private IConfiguration config;
       private SemanticUtility semanticUtility;
@@ -42,7 +43,7 @@ namespace DocumentQuestions.Library
             log.LogInformation($"Parsing Document Intelligence results...");
             var contents = SplitDocumentIntoPagesAndParagraphs(result, file.Name);
             var taskList = new List<Task>();
-            string memoryCollectionName = Path.GetFileNameWithoutExtension(file.Name);
+            string memoryCollectionName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(file.Name).ToLower());
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
             taskList.Add(semanticUtility.StoreMemoryAsync(memoryCollectionName, contents));
             taskList.Add(semanticUtility.StoreMemoryAsync("general", contents));
@@ -51,7 +52,8 @@ namespace DocumentQuestions.Library
          log.LogInformation("Document Processed and Indexed");
 
       }
-      private Dictionary<string,string> SplitDocumentIntoPagesAndParagraphs(AnalyzeResult result, string fileName)
+   
+      private Dictionary<string, string> SplitDocumentIntoPagesAndParagraphs(AnalyzeResult result, string fileName)
       {
          var content = "";
          bool contentFound = false;
@@ -62,7 +64,7 @@ namespace DocumentQuestions.Library
          log.LogInformation("Checking document data...");
          foreach (DocumentPage page in result.Pages)
          {
-            
+
             for (int i = 0; i < page.Lines.Count; i++)
             {
                DocumentLine line = page.Lines[i];

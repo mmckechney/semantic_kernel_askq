@@ -6,13 +6,14 @@ using Microsoft.Extensions.Logging.Console;
 using DocumentQuestions.Library;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
 using Azure;
+using Azure.Identity;
 
 namespace DocumentQuestions.Console
 {
    internal class Program
    {
-      private static ILogger log;
-      private static ILoggerFactory logFactory;
+      //private static ILogger log;
+      //private static ILoggerFactory logFactory;
 
       public static void Main(string[] args)
       {
@@ -48,11 +49,8 @@ namespace DocumentQuestions.Console
                    var config = sp.GetRequiredService<IConfiguration>();
 
                    var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
-                   var apiKey = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
-
-                   var credentials = new AzureKeyCredential(apiKey);
-
-                   return new DocumentAnalysisClient(endpoint, credentials);
+                   var key = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
+                   return new DocumentAnalysisClient(endpoint, new AzureKeyCredential(key));
                 });
                 services.AddSingleton<Common>();
                 services.AddHostedService<Worker>();

@@ -1,5 +1,6 @@
 ﻿using Azure;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
+using Azure.Identity;
 using DocumentQuestions.Library;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,13 +54,9 @@ namespace DocumentQuestions.Function
          services.AddSingleton(sp =>
          {
             var config = sp.GetRequiredService<IConfiguration>();
-
-            var endpoint = config.GetValue<Uri>("DocumentIntelligenceEndpoint");
-            var apiKey = config.GetValue<string>("DocumentIntelligenceSubscriptionKey");
-
-            var credentials = new AzureKeyCredential(apiKey);
-
-            return new DocumentAnalysisClient(endpoint, credentials);
+            var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
+            var key = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
+            return new DocumentAnalysisClient(endpoint, new AzureKeyCredential(key));
          });
          services.AddHttpClient();
 
