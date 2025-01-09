@@ -3,8 +3,8 @@ param(
     [string] $location,
     [string] $openAiEndpoint,
     [string] $openAiKey,
-    [string] $openAIChatModel = "gpt-4",
-    [string] $openAIChatDeploymentName = "gpt-4-turbo",
+    [string] $openAIChatModel = "gpt-4o",
+    [string] $openAIChatDeploymentName = "gpt-4o",
     [string] $openAIEmbeddingModel = "text-embedding-ada-002",
     [string] $openAIEmbeddingDeploymentName =  "text-embedding-ada-002",
     [bool] $localCodeOnly = $false

@@ -15,21 +15,19 @@ This solution provides an example of how to process your own documents and then 
 
    1. `HttpTriggerUploadFile` - upload documents to an Azure Storage account via a REST Api
    2. `BlobTriggerProcessFile` - detects the uploaded document and processes it through [Azure Cognitive Services Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?view=doc-intel-3.1.0) into one or more JSON files (depending on the size of the document)
-   3. `HttpTriggerOpenAiSdkAskQuestion` - REST Api to ask questions about the document using the OpenAI SDK
-   4. `HttpTriggerSemanticKernelAskQuestion` - REST Api to ask questions about the document using Semantic Kernel SDK
+   3. `HttpTriggerSemanticKernelAskQuestion` - REST Api to ask questions about the document using Semantic Kernel SDK
 
 ## Getting Started
 
 ### Prerequisites
 
-Before deploying your solution, you will need access to an Azure OpenAI instance in the same subscription where you are going to deploy your solution and retrieve its `Endpoint` and a `Key`
+- Before deploying your solution, you will need access to an Azure OpenAI instance in the same subscription where you are going to deploy your solution and retrieve its `Endpoint` and a `Key`.
+- The PowerShell deployment script defaults to `gpt-4o` and `text-embedding-ada-002` models with a deployment name matching the model name. If you have something different in your Azure OpenAI instance, you will want to pass in those values to the PowerShell command line deployed to your Azure OpenAI instance each with a deployment name matching the model name. Be aware, that using a different GPT model may result in max token violations with the example below.
 
 ### Deploying
 
 Deployment is automated using PowerShell, the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/) and [Bicep](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/).\
 To run the script, you will need to select an Azure location for deployment, the Azure Open AI endpoint and key and pick a name for the function (this must be a globally unique name and less than 10 characters).
-
-*NOTE:* The template assumes you have both `gpt-4-32k` and `text-embedding-ada-002` models deployed to your Azure OpenAI instance. If you want to use a different model, change the `openAIChatModel` and `openAIEmbeddingModel` default parameter values in `./infra/functions.bicep` file. Be aware, that using a different GPT model may result in max token violations with the example below.
 
 By default, the script will deploy an [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) instance and use it to store the results of the document processing and searching. If you do not want to deploy Azure Cognitive Search, you can use the `-useCognitiveSeach $false` parameter option to skip the deployment of Azure Cognitive Search and only use the `extracted` blob container to store the results of the document processing.
 
@@ -115,7 +113,7 @@ If you used the `deploy.ps1` script, the console app will be compiled and starte
 
 - `ai list` - list the Azure OpenAI models configured for the app
 
-   ![ai list command](images/ai-list.png)   
+   ![ai list command](images/ai-list.png)
 
 - `ai set` - set the Azure OpenAI model to use for asking questions (these must already be deployed in your Azure AI instance)
 
