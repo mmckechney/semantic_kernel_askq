@@ -21,7 +21,7 @@ This solution provides an example of how to process your own documents and then 
 
 ### Prerequisites
 
-- Before deploying your solution, you will need access to an Azure OpenAI instance in the same subscription where you are going to deploy your solution and retrieve its `Endpoint` and a `Key`.
+- The deployment script can create a new Azure OpenAI Service for you however if you want to reuse an existing one, it will need to be in the same subscription where you are going to deploy your solution and retrieve its `Endpoint` and a `Key`.
 - The PowerShell deployment script defaults to `gpt-4o` and `text-embedding-ada-002` models with a deployment name matching the model name. If you have something different in your Azure OpenAI instance, you will want to pass in those values to the PowerShell command line deployed to your Azure OpenAI instance each with a deployment name matching the model name. Be aware, that using a different GPT model may result in max token violations with the example below.
 
 ### Deploying
@@ -31,11 +31,20 @@ To run the script, you will need to select an Azure location for deployment, the
 
 By default, the script will deploy an [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) instance and use it to store the results of the document processing and searching. If you do not want to deploy Azure Cognitive Search, you can use the `-useCognitiveSeach $false` parameter option to skip the deployment of Azure Cognitive Search and only use the `extracted` blob container to store the results of the document processing.
 
+**NOTE:** If deploying a new Azure OpenAI instance, be aware there are location limitations base on model. Please set your `openAiLocation` value accordingly: 
+[Region Availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#model-summary-table-and-region-availability)
+
+Also, depending on your availble Azure OpenAI model quota, you may get a capacity related deployment error. If you do, you will need to modify the `capacity` value for the appropriate model found in the [`infra/azureopenai.bicep`](infra/azureopenai.bicep) file
+
+
 ``` powershell
 # obtain an Azure access token
 az login
 
-# deploy the solution
+# deploy the solution - creating a new Azure OpenAI Service (note the separate item for OpenAI Location as there are some restrictions for this service)
+.\deploy.ps1 -functionAppName  <function name>  -location <azure location> -openAILocation <openai key>
+
+# OR.. reusing an existing Azure Open AI Service
 .\deploy.ps1 -functionAppName  <function name>  -openAiEndpoint <http endpoint value> -openAiKey <openai key> -location <azure location>
 ```
 
