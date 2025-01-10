@@ -1,6 +1,9 @@
 param(
+    [Parameter(Mandatory = $True)]
 	[string] $functionAppName,
+    [Parameter(Mandatory = $True)]
     [string] $location,
+    [string] $openAILocation,
     [string] $openAiEndpoint,
     [string] $openAiKey,
     [string] $openAIChatModel = "gpt-4o",
@@ -13,13 +16,22 @@ param(
 $error.Clear()
 $ErrorActionPreference = 'Stop'
 
+$safeFuncAppName =  $functionAppName.ToLower() -replace '[-_]', ''
+$safeFuncAppName  = $safeFuncAppName.Substring(0, [math]::Min(13, $safeFuncAppName.Length))
+
 $resourceGroupName = $functionAppName + "-rg"
-$storageAccountName = ($functionAppName + "storage").ToLower().Replace("-","").Replace("_","")
+$storageAccountName = $safeFuncAppName + "storage"
 $docIntelligenceAccountName = $functionAppName + "-aidoc"
-$aiSearchName = $functionAppName.ToLower() + "-aisearch"
+$aiSearchName = $safeFuncAppName + "-aisearch"
 $keyVaultName = $functionAppName + "-keyvault"
+$openAiServiceName = $safeFuncAppName + "-openai"
 
+if($openAILocation.Length -eq 0)
+{
+    $openAILocation = $location
+}
 
+$deployOpenAi = $true
 Write-Host "Getting current user object id" -ForegroundColor DarkCyan
 $currentUserObjectId = az ad signed-in-user show -o tsv --query id
 Write-Host "Current User Object Id: $currentUserObjectId" -ForegroundColor Green
@@ -30,11 +42,24 @@ Write-Host "Function App Name: $functionAppName" -ForegroundColor Green
 Write-Host "Storage Account Name: $storageAccountName" -ForegroundColor Green
 Write-Host "Document Intelligence AI Services Account Name: $docIntelligenceAccountName" -ForegroundColor Green
 Write-Host "AI Search Account Name: $aiSearchName" -ForegroundColor Green
-Write-Host "Azure OpenAI chat model: $openAIChatModel" -ForegroundColor Green
-Write-Host "Azure OpenAI chat deployment name: $openAIChatDeploymentName" -ForegroundColor Green
-Write-Host "Azure OpenAI embedding model: $openAIEmbeddingModel" -ForegroundColor Green
-Write-Host "Azure OpenAI embedding deployment name: $openAIEmbeddingDeploymentName" -ForegroundColor Green
-Write-Host "Azure Open AI Endpoint: $openAiEndpoint" -ForegroundColor Green
+if($openAiEndpoint.Length -ne 0 -and $openAiKey.Length -ne 0)
+{
+    Write-Host "OpenAI endpoint and key provided, using existing Azure OpenAI deployment" -ForegroundColor DarkCyan
+    Write-Host "Open AI Endpoint: $openAiEndpoint" -ForegroundColor Green
+    $deployOpenAi = $false
+}
+else 
+{
+    Write-Host "OpenAI Location: $openAILocation" -ForegroundColor Green
+    Write-Host "OpenAI Service Name: $openAiServiceName" -ForegroundColor Green
+}    
+
+Write-Host "OpenAI chat model: $openAIChatModel" -ForegroundColor Green
+Write-Host "OpenAI chat deployment name: $openAIChatDeploymentName" -ForegroundColor Green
+Write-Host "OpenAI embedding model: $openAIEmbeddingModel" -ForegroundColor Green
+Write-Host "OpenAI embedding deployment name: $openAIEmbeddingDeploymentName" -ForegroundColor Green
+  
+
 if($localCodeOnly -eq $true)
 {
     Write-Host "Local code only, skipping Azure Bicep Deployment" -ForegroundColor DarkCyan
@@ -46,7 +71,8 @@ else
        --parameters resourceGroupName=$resourceGroupName location=$location `
        functionAppName=$functionAppName storageAccountName=$storageAccountName `
        docIntelligenceAccountName=$docIntelligenceAccountName aiSearchName=$aiSearchName `
-       openAiEndpoint=$openAiEndpoint openAiKey=$openAiKey `
+       openAILocation=$openAILocation openAIServiceName=$openAiServiceName deployOpenAI=$deployOpenAi `
+       openAIEndpoint=$openAiEndpoint openAIKey=$openAiKey `
        openAIChatModel=$openAIChatModel openAIChatDeploymentName=$openAIChatDeploymentName `
        openAIEmbeddingModel=$openAIEmbeddingModel openAIEmbeddingDeploymentName=$openAIEmbeddingDeploymentName `
        currentUserObjectId=$currentUserObjectId `
@@ -67,6 +93,12 @@ Write-Host -ForegroundColor Green "Getting AI Search account account key"
 $aiSearchKey = az search admin-key show --resource-group $resourceGroupName  --service-name $aiSearchName -o tsv --query primaryKey
 $docIntelligenceKey = az cognitiveservices account keys list --name $docIntelligenceAccountName --resource-group $resourceGroupName -o tsv --query key1
 
+if($openAiServiceName.Length -ne 0)
+{
+    Write-Host -ForegroundColor Green "Getting OpenAI key and endpoint"
+    $openAiKey =  az cognitiveservices account keys list --name $openAiServiceName --resource-group $resourceGroupName -o tsv --query key1
+    $openAiEndpoint =  az cognitiveservices account show --name $openAiServiceName --resource-group $resourceGroupName -o tsv --query properties.endpoint
+}
 
 $json = Get-Content 'infra/constants.json' | ConvertFrom-Json
 $appSettings = @{
@@ -138,7 +170,12 @@ $funcSettings = @{
 
 Push-Location -Path .\DocumentQuestionsConsole\
 Write-Host "Building Connsole App" -ForegroundColor Green
-dotnet build . -c debug -warnaserror none
+dotnet build . -c debug -nowarn:*
+Pop-Location
+
+if(!$?){ exit }
+Push-Location -Path .\DocumentQuestionsConsole\
+Write-Host "Running Connsole App" -ForegroundColor Green
 dotnet run --no-build -- -h
 Pop-Location
 

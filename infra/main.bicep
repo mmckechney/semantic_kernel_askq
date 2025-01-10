@@ -9,13 +9,16 @@ param keyVaultName string
 param storageAccountName string
 param docIntelligenceAccountName string
 param aiSearchName string
-param openAiEndpoint string
-param openAiKey string
+param openAIEndpoint string
+param openAIKey string
 param currentUserObjectId string
 param openAIChatModel string
 param openAIChatDeploymentName string
 param openAIEmbeddingDeploymentName string
 param openAIEmbeddingModel string
+param openAIServiceName string
+param openAILocation   string
+param deployOpenAI bool = true
 
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
@@ -29,8 +32,8 @@ module keyVault 'keyvault.bicep' = {
     params: {
         location: location
         keyVaultName: keyVaultName
-        openAiEndpoint : openAiEndpoint
-        openAiKey: openAiKey
+        openAiEndpoint : openAIEndpoint
+        openAiKey: openAIKey
 
     }
     dependsOn: [
@@ -114,6 +117,24 @@ module roleAssignments 'roleassignments.bicep' = {
     ]
 }
 
+module openAI 'azureopenai.bicep' = if (deployOpenAI) {
+    name: 'azureOpenAI'
+    scope: resourceGroup(resourceGroupName)
+   params: {
+    location: openAILocation
+    name: openAIServiceName
+    chatModel: openAIChatModel
+    chatDeploymentName: openAIChatDeploymentName
+    embeddingModel: openAIEmbeddingModel
+    embeddingDeploymentName: openAIEmbeddingDeploymentName
+    keyVaultName: keyVaultName
+   }
+    dependsOn: [
+        rg
+        keyVault
+    ]
+}
+
 var openAiUserRole = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 var functionAppId = functionResources.outputs.functionAppId
 resource func_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -131,6 +152,10 @@ resource user_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-
         principalId: currentUserObjectId
     }
 }
+
+
+  
+
 
 output docIntelEndpoint string = docIntelligence.outputs.docIntelEndpoint
 output extractedContainerName string = storageResources.outputs.extractedContainerName
