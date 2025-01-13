@@ -168,7 +168,7 @@ namespace DocumentQuestions.Console
          {
             sb = new StringBuilder();
             syS.Console.WriteLine();
-            if (firstPass && string.IsNullOrWhiteSpace(activeDocument))
+            if (firstPass || string.IsNullOrWhiteSpace(activeDocument))
             {
                fileCount = await rootParser.InvokeAsync("list");
             }

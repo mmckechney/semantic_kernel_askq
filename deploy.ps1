@@ -85,7 +85,7 @@ else
    Write-Host "Publishing $functionAppName to $resourceGroupName" -ForegroundColor Green
    dotnet clean -c release
    dotnet clean -c debug
-   func azure functionapp publish $functionAppName 
+   func azure functionapp publish $functionAppName  --dotnet-isolated
    Pop-Location
 }
 
