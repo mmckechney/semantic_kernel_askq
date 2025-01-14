@@ -14,9 +14,6 @@ using System.Text;
 
 namespace DocumentQuestions.Library
 {
-#pragma warning disable SKEXP0052 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-#pragma warning disable SKEXP0021 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-#pragma warning disable SKEXP0011 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
    public class SemanticUtility
    {
@@ -27,19 +24,21 @@ namespace DocumentQuestions.Library
       ILoggerFactory logFactory;
       bool usingVolatileMemory = false;
       Common common;
-      public SemanticUtility(ILoggerFactory logFactory, IConfiguration config, Common common)
+      IFunctionInvocationFilter skInvocationFilter;
+      public SemanticUtility(ILoggerFactory logFactory, IConfiguration config, Common common, IFunctionInvocationFilter skInvocationFilter)
       {
          log = logFactory.CreateLogger<SemanticUtility>();
          this.config = config;
          this.logFactory = logFactory;
          this.common = common;
+         this.skInvocationFilter = skInvocationFilter;
          InitMemoryAndKernel();
       }
 
 
       public void InitMemoryAndKernel()
       {
-         var openAiChatDeploymentNAme = config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_DEPLOYMENT_NAME} in configuration.");
+         var openAiChatDeploymentName = config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_DEPLOYMENT_NAME} in configuration.");
          var openAiChatModelName = config[Constants.OPENAI_CHAT_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_MODEL_NAME} in configuration.");
 
          var openAIEndpoint = config[Constants.OPENAI_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.OPENAI_ENDPOINT} in configuration.");
@@ -55,14 +54,16 @@ namespace DocumentQuestions.Library
 
          var memBuilder = new MemoryBuilder()
              .WithMemoryStore(store)
-             .WithTextEmbeddingGeneration(new AzureOpenAITextEmbeddingGenerationService(deploymentName: embeddingDeploymentName, modelId: embeddingModel, endpoint: openAIEndpoint, apiKey: apiKey));
-             //.WithLoggerFactory(logFactory);
+             .WithTextEmbeddingGeneration(new AzureOpenAITextEmbeddingGenerationService(deploymentName: embeddingDeploymentName, modelId: embeddingModel, endpoint: openAIEndpoint, apiKey: apiKey))
+             .WithLoggerFactory(logFactory);
 
          semanticMemory = memBuilder.Build();
 
          //Build and configure the kernel
          var kernelBuilder = Kernel.CreateBuilder();
-         kernelBuilder.AddAzureOpenAIChatCompletion(deploymentName: openAiChatDeploymentNAme, modelId: openAiChatModelName, endpoint: openAIEndpoint, apiKey: apiKey);
+         kernelBuilder.AddAzureOpenAIChatCompletion(deploymentName: openAiChatDeploymentName, modelId: openAiChatModelName, endpoint: openAIEndpoint, apiKey: apiKey);
+         
+         //uncomment to add logging for Semantic Kernel invocations
          //kernelBuilder.Services.AddSingleton(logFactory);
 
          kernel = kernelBuilder.Build();
@@ -84,8 +85,13 @@ namespace DocumentQuestions.Library
          });
          var plugin = KernelPluginFactory.CreateFromFunctions("YAMLPlugins", yamlPrompts.Select(y => y.Value).ToArray());
          kernel.Plugins.Add(plugin);
+         
+         kernel.FunctionInvocationFilters.Add(skInvocationFilter);
 
       }
+
+ 
+
       public async Task<string> AskQuestion(string question, string documentContent)
       {
          log.LogInformation("Asking question about document...");
@@ -111,14 +117,22 @@ namespace DocumentQuestions.Library
          var i = 0;
          foreach (var entry in docFile)
          {
-            await semanticMemory.SaveReferenceAsync(
-                collection: collectionName,
-                externalSourceName: "BlobStorage",
-                externalId: entry.Key,
-                description: entry.Value,
-                text: entry.Value);
+            if(!string.IsNullOrWhiteSpace(entry.Value))
+            {
+               await semanticMemory.SaveReferenceAsync(
+               collection: collectionName,
+               externalSourceName: "BlobStorage",
+               externalId: entry.Key,
+               description: entry.Value,
+               text: entry.Value);
 
-            log.LogDebug($" #{++i} saved to {collectionName}.");
+               log.LogDebug($" #{++i} saved to {collectionName}.");
+            }
+            else
+            {
+               log.LogWarning($"The contents of {entry.Key} was empty. Unable to save to the index {collectionName}");
+            }
+           
          }
       }
       public async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(string collectionName, string query)

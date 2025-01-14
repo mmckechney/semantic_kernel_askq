@@ -9,13 +9,30 @@ This solution provides an example of how to process your own documents and then 
 
 ![ Architecture Diagram ](images/Architecture.png)
 
+## Updates
+
+**January 2025:**
+
+- Updated SDK to Azure.AI.DocumentIntelligence to access the latest API versions and models
+- Added ability to target additional prebuilt models on the console app with the `process --file "<file name> --model <model name> command` To see the list of available models run `process -h`
+  - To add addition prebuilt models of interest, add the model name to the list found at the top of [DocumentQuestionsLibrary/DocumentIntelligence.cs](DocumentQuestionsLibrary/DocumentIntelligence.cs). The list of models is maintained [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/model-overview?view=doc-intel-4.0.0)
+- Added new command `clear-index` which will delete process document indexes by name or all of the indexes using the `all` keyword
+- Added sample telemetry with [DocumentQuestionsLibrary/SkFunctionInvocationFilter.cs](DocumentQuestionsLibrary/SkFunctionInvocationFilter.cs) demonstrating how to intercept Semantic Kernel function invocation before and after execution of the function
+- Added OpenTelemetry configuration to the Console app and the Function if the `APPLICATIONINSIGHTS_CONNECTION_STRING` app setting is provided
+
+*NOTE:* I haven't updated the screen shots below with the lasted console app changes (nor have I fully tested the function app)
+
 ## What's Included
 
- This solution consists of C# function app which has 4 functions:
+ This solution consists of:
 
-   1. `HttpTriggerUploadFile` - upload documents to an Azure Storage account via a REST Api
-   2. `BlobTriggerProcessFile` - detects the uploaded document and processes it through [Azure Cognitive Services Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?view=doc-intel-3.1.0) into one or more JSON files (depending on the size of the document)
-   3. `HttpTriggerSemanticKernelAskQuestion` - REST Api to ask questions about the document using Semantic Kernel SDK
+ - C# function app which has 3 functions:
+
+     1. `HttpTriggerUploadFile` - upload documents to an Azure Storage account via a REST Api
+     2. `BlobTriggerProcessFile` - detects the uploaded document and processes it through [Azure Cognitive Services Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?view=doc-intel-3.1.0) into one or more JSON files (depending on the size of the document)
+     3. `HttpTriggerSemanticKernelAskQuestion` - REST Api to ask questions about the document using Semantic Kernel SDK
+
+- A console app to easily run and test locally
 
 ## Getting Started
 

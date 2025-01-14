@@ -4,7 +4,7 @@ param location string = resourceGroup().location
 
 var kvKeys = loadJsonContent('./kvKeys.json')
 
-resource docIntelAccount 'Microsoft.CognitiveServices/accounts@2021-04-30' = {
+resource docIntelAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: docIntelAccountName
   location: location
   kind: 'CognitiveServices'

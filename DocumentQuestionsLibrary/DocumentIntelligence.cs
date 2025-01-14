@@ -1,5 +1,5 @@
 ﻿using Azure;
-using Azure.AI.FormRecognizer.DocumentAnalysis;
+using Azure.AI.DocumentIntelligence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,37 +15,62 @@ namespace DocumentQuestions.Library
 
    public class DocumentIntelligence
    {
-      private DocumentAnalysisClient documentAnalysisClient;
+      public static List<string> ModelList =
+           [   "prebuilt-read",
+               "prebuilt-mortgage.us.1003",
+               "prebuilt-mortgage.us.1004",
+               "prebuilt-mortgage.us.1005",
+               "prebuilt-mortgage.us.1008",
+               "prebuilt-mortgage.us.closingDisclosure",
+               "prebuilt-tax.us",
+               "prebuilt-idDocument"
+           ];
+
+      private DocumentIntelligenceClient docIntelClient;
       //private ILoggerFactory logFactory;
       private ILogger<DocumentIntelligence> log;
       private IConfiguration config;
       private SemanticUtility semanticUtility;
+      private Common common;
 
-      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, DocumentAnalysisClient documentAnalysisClient)
+      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, DocumentIntelligenceClient docIntelClient, Common common)
       {
          this.log = log;
          this.config = config;
-         this.documentAnalysisClient = documentAnalysisClient;
+         this.docIntelClient = docIntelClient;
          this.semanticUtility = semanticUtility;
+         this.common = common;
       }
 
-      public async Task ProcessDocument(FileInfo file)
+      public async Task ProcessDocument(FileInfo file, string modelId, string indexName)
       {
-         log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
-         AnalyzeDocumentOperation operation;
+         if(!string.IsNullOrWhiteSpace(indexName))
+         {
+            indexName = Common.ReplaceInvalidCharacters(indexName);
+         }
+
+         //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
+         Operation<AnalyzeResult> operation;
          using (FileStream stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read))
          {
-            operation = await documentAnalysisClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, "prebuilt-read", stream);
+            log.LogInformation($"Analyzing document with model ID: {modelId} ");
+            BinaryData document = BinaryData.FromStream(stream);
+            operation = await docIntelClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, modelId, document);
          }
          AnalyzeResult result = operation.Value;
          if (result != null)
          {
+            await common.WriteAnalysisContentToBlob(file.Name, 0, result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
             var contents = SplitDocumentIntoPagesAndParagraphs(result, file.Name);
             var taskList = new List<Task>();
-            string memoryCollectionName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(file.Name).ToLower());
+
+            if (string.IsNullOrWhiteSpace(indexName))
+            {
+               indexName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(file.Name).ToLower());
+            }
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
-            taskList.Add(semanticUtility.StoreMemoryAsync(memoryCollectionName, contents));
+            taskList.Add(semanticUtility.StoreMemoryAsync(indexName, contents));
             taskList.Add(semanticUtility.StoreMemoryAsync("general", contents));
             Task.WaitAll(taskList.ToArray());
          }
@@ -76,7 +101,7 @@ namespace DocumentQuestions.Library
             if (!string.IsNullOrEmpty(content))
             {
                log.LogDebug("content = " + content);
-               //taskList.Add(WriteAnalysisContentToBlob(name, page.PageNumber, content, log));
+               taskList.Add(common.WriteAnalysisContentToBlob(fileName, page.PageNumber, content, log));
                docContent.Add(GetFileName(fileName, page.PageNumber), content);
             }
             content = "";
@@ -98,7 +123,7 @@ namespace DocumentQuestions.Library
                   }
                   else
                   {
-                     //taskList.Add(WriteAnalysisContentToBlob(name, counter, content, log));
+                     taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
                      docContent.Add(GetFileName(fileName, counter), content);
                      counter++;
 
@@ -109,7 +134,7 @@ namespace DocumentQuestions.Library
             }
 
             //Add the last paragraph
-            //taskList.Add(WriteAnalysisContentToBlob(name, counter, content, log));
+            taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
             docContent.Add(GetFileName(fileName, counter), content);
          }
 
