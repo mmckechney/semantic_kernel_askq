@@ -116,5 +116,59 @@ namespace DocumentQuestions.Library
          }
          return docFile;
       }
+
+
+      public string GetFileName(string name, int counter)
+      {
+         string nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
+         string newName = nameWithoutExtension.Replace(".", "_");
+         newName += $"_{counter.ToString().PadLeft(4, '0')}.json";
+         return newName;
+      }
+
+      public async Task<bool> WriteAnalysisContentToBlob(string name, int counter, string content, ILogger log)
+      {
+         try
+         {
+            string newName = GetFileName(name, counter);
+            string blobName = Path.GetFileNameWithoutExtension(name) + "/" + newName;
+
+            var jsonObj = new ProcessedFile
+            {
+               FileName = name,
+               BlobName = blobName,
+               Content = content
+            };
+            string jsonStr = JsonSerializer.Serialize(jsonObj);
+
+            // Save the JSON string to Azure Blob Storage  
+            string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
+            string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
+
+            var blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
+            BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            containerClient.CreateIfNotExists();
+
+            BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+            using (var stream = new MemoryStream())
+            {
+               byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(jsonStr);
+               stream.Write(jsonBytes, 0, jsonBytes.Length);
+               stream.Seek(0, SeekOrigin.Begin);
+               await blobClient.UploadAsync(stream, overwrite: true);
+
+            }
+
+            log.LogInformation($"JSON file {newName} saved to Azure Blob Storage.");
+            return true;
+
+         }
+         catch (Exception exe)
+         {
+            log.LogError("Unable to save file: " + exe.Message);
+            return false;
+         }
+      }
    }
 }

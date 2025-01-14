@@ -104,6 +104,27 @@ namespace DocumentQuestions.Console
          }
       }
 
+      internal async static Task ClearIndex(string[] indexes)
+      {
+         if (indexes.Length > 0)
+         {
+            var deleted = await aiSearch.ClearIndexes(indexes.ToList());
+            if (deleted.Count > 0)
+            {
+               log.LogInformation("The following indexes were deleted:", ConsoleColor.Yellow);
+               foreach (var name in deleted)
+               {
+                  log.LogInformation($"\t{name}");
+               }
+            }
+            else
+            {
+               log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
+            }
+         }
+         log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
+      }
+
       internal static void ListAiSettings()
       {
          int pad = 21;
@@ -132,8 +153,12 @@ namespace DocumentQuestions.Console
          return names.Count;
       }
 
-      internal static async Task ProcessFile(string[] file)
+      internal static async Task ProcessFile(string file, string model, string index)
       {
+         if(string.IsNullOrWhiteSpace(model))
+         {
+            model = "prebuilt-read";
+         }
          if(file.Length == 0)
          {
             log.LogInformation("Please enter a file name to process", ConsoleColor.Red);
@@ -145,7 +170,7 @@ namespace DocumentQuestions.Console
             log.LogInformation($"The file {name} doesn't exist. Please enter a valid file name", ConsoleColor.Red);
             return;
          }
-         await documentIntelligence.ProcessDocument(new FileInfo(name));
+         await documentIntelligence.ProcessDocument(new FileInfo(name),model, index);
       }
 
       internal static void SetActiveDocument(string[] document)

@@ -1,5 +1,5 @@
 using Azure;
-using Azure.AI.FormRecognizer.DocumentAnalysis;
+using Azure.AI.DocumentIntelligence;
 using Azure.Storage.Blobs;
 using DocumentQuestions.Library;
 using Microsoft.Azure.Functions.Worker;
@@ -20,14 +20,16 @@ namespace DocumentQuestions.Function
       private ILoggerFactory logFactory;
       private ILogger<BlobTriggerProcessFile> log;
       private IConfiguration config;
-      private DocumentAnalysisClient documentAnalysisClient;
-      public BlobTriggerProcessFile(ILoggerFactory logFactory, IConfiguration config, SemanticUtility semanticMemory, DocumentAnalysisClient documentAnalysisClient)
+      private DocumentIntelligenceClient docIntelClient;
+      private Common common;
+      public BlobTriggerProcessFile(ILoggerFactory logFactory, IConfiguration config, SemanticUtility semanticMemory, DocumentIntelligenceClient docIntelClient, Common common)
       {
          this.semanticMemory = semanticMemory;
          this.logFactory = logFactory;
          log = logFactory.CreateLogger<BlobTriggerProcessFile>();
          this.config = config;
-         this.documentAnalysisClient = documentAnalysisClient;
+         this.docIntelClient = docIntelClient;
+         this.common = common;
       }
 
       [Function("BlobTriggerProcessFile")]
@@ -53,7 +55,7 @@ namespace DocumentQuestions.Function
             Uri fileUri = new Uri(imgUrl);
 
             log.LogInformation("About to get data from document intelligence module.");
-            AnalyzeDocumentOperation operation = await documentAnalysisClient.AnalyzeDocumentFromUriAsync(WaitUntil.Completed, "prebuilt-read", fileUri);
+            Operation<AnalyzeResult> operation = await docIntelClient.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-read", fileUri);
             AnalyzeResult result = operation.Value;
 
             var content = "";
@@ -76,8 +78,8 @@ namespace DocumentQuestions.Function
                if (!string.IsNullOrEmpty(content))
                {
                   log.LogInformation("content = " + content);
-                  taskList.Add(WriteAnalysisContentToBlob(name, page.PageNumber, content, log));
-                  docContent.Add(GetFileName(name, page.PageNumber), content);
+                  taskList.Add(common.WriteAnalysisContentToBlob(name, page.PageNumber, content, log));
+                  docContent.Add(common.GetFileName(name, page.PageNumber), content);
                }
                content = "";
             }
@@ -98,8 +100,8 @@ namespace DocumentQuestions.Function
                      }
                      else
                      {
-                        taskList.Add(WriteAnalysisContentToBlob(name, counter, content, log));
-                        docContent.Add(GetFileName(name, counter), content);
+                        taskList.Add(common.WriteAnalysisContentToBlob(name, counter, content, log));
+                        docContent.Add(common.GetFileName(name, counter), content);
                         counter++;
 
                         content = paragraph.Content;
@@ -109,8 +111,8 @@ namespace DocumentQuestions.Function
                }
 
                //Add the last paragraph
-               taskList.Add(WriteAnalysisContentToBlob(name, counter, content, log));
-               docContent.Add(GetFileName(name, counter), content);
+               taskList.Add(common.WriteAnalysisContentToBlob(name, counter, content, log));
+               docContent.Add(common.GetFileName(name, counter), content);
             }
             taskList.Add(semanticMemory.StoreMemoryAsync(memoryCollectionName, docContent));
             taskList.Add(semanticMemory.StoreMemoryAsync("general", docContent));
@@ -125,58 +127,7 @@ namespace DocumentQuestions.Function
 
 
       }
-      private string GetFileName(string name, int counter)
-      {
-         string nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
-         string newName = nameWithoutExtension.Replace(".", "_");
-         newName += $"_{counter.ToString().PadLeft(4, '0')}.json";
-         return newName;
-      }
-
-      private async Task<bool> WriteAnalysisContentToBlob(string name, int counter, string content, ILogger log)
-      {
-         try
-         {
-            string newName = GetFileName(name, counter);
-            string blobName = Path.GetFileNameWithoutExtension(name) + "/" + newName;
-
-            var jsonObj = new ProcessedFile
-            {
-               FileName = name,
-               BlobName = blobName,
-               Content = content
-            };
-            string jsonStr = JsonConvert.SerializeObject(jsonObj);
-
-            // Save the JSON string to Azure Blob Storage  
-            string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
-            string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
-
-            var blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
-            BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-            containerClient.CreateIfNotExists();
-
-            BlobClient blobClient = containerClient.GetBlobClient(blobName);
-
-            using (var stream = new MemoryStream())
-            {
-               byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(jsonStr);
-               stream.Write(jsonBytes, 0, jsonBytes.Length);
-               stream.Seek(0, SeekOrigin.Begin);
-               await blobClient.UploadAsync(stream, overwrite: true);
-
-            }
-
-            log.LogInformation($"JSON file {newName} saved to Azure Blob Storage.");
-            return true;
-
-         }
-         catch (Exception exe)
-         {
-            log.LogError("Unable to save file: " + exe.Message);
-            return false;
-         }
-      }
+     
 
    }
 }

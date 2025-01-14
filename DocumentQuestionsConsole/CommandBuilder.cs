@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using DocumentQuestions.Library;
+using Microsoft.Extensions.Hosting;
 using Spectre.Console;
 using System;
 using System.CommandLine;
@@ -6,6 +7,7 @@ using System.CommandLine.Builder;
 using System.CommandLine.Help;
 using System.CommandLine.NamingConventionBinder;
 using System.CommandLine.Parsing;
+using System.Diagnostics;
 using System.Linq;
 
 namespace DocumentQuestions.Console
@@ -26,14 +28,25 @@ namespace DocumentQuestions.Console
          askQuestionCommand.Add(questionArg);
          askQuestionCommand.Handler = CommandHandler.Create<string[]>(Worker.AskQuestion);
 
-         var fileArg = new Argument<string[]>("file", "Path to the file to process and index") { Arity = ArgumentArity.ZeroOrMore };
-         var uploadCommand = new Command("process", "Process the file contents against Document Intelligence and add to Azure AI Search index");
-         uploadCommand.Add(fileArg);
-         uploadCommand.Handler = CommandHandler.Create<string[]>(Worker.ProcessFile);
+         var fileOpt = new Option<string>(new string[]{ "--file", "-f" }, "Path to the file to process and index (surround with quotes if there are spaces in the name)") { IsRequired = true };
+         var modelOpt = new Option<string>(new string[] { "--model", "-m" }, () => "prebuilt-read", $"Model to use for processing the document: {string.Join(", ", DocumentIntelligence.ModelList)}");
+         var indexNameOpt = new Option<string>(new string[] { "--index", "-i" }, $"Custom index name, otherwise it will default to the file name");
+         var processFileCommand = new Command("process", "Process the file contents against Document Intelligence and add to Azure AI Search index")
+         {
+            fileOpt,
+            modelOpt,
+            indexNameOpt
+         };
+         processFileCommand.Handler = CommandHandler.Create<string, string, string>(Worker.ProcessFile);
 
 
          var listCommand = new Command("list", "List the available files to ask questions about");
          listCommand.Handler = CommandHandler.Create(Worker.ListFiles);
+
+         var clearIndexCommand = new Command("clear-index", "Clears the index for the specified files or for all files if \"all\" is used");
+         var clearIndexArg = new Argument<string[]>("indexes", "Names of indexes (files) to clear. User \"all\" to delete all indexes") { Arity = ArgumentArity.ZeroOrMore };
+         clearIndexCommand.Add(clearIndexArg);
+         clearIndexCommand.Handler = CommandHandler.Create<string[]>(Worker.ClearIndex);
 
 
          RootCommand rootCommand = new RootCommand(description: $"Utility to ask questions on documents that have been indexed in Azure AI Search");
@@ -41,8 +54,9 @@ namespace DocumentQuestions.Console
          rootCommand.Handler = CommandHandler.Create<string[]>(Worker.AskQuestion);
          rootCommand.Add(docCommand);
          rootCommand.Add(askQuestionCommand);
-         rootCommand.Add(uploadCommand);
+         rootCommand.Add(processFileCommand);
          rootCommand.Add(listCommand);
+         rootCommand.Add(clearIndexCommand);
          rootCommand.Add(AIRuntimeSetCommand());
 
          var parser = new CommandLineBuilder(rootCommand)
