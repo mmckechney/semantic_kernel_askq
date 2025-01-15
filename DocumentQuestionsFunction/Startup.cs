@@ -29,7 +29,7 @@ namespace DocumentQuestions.Function
          var config = new ConfigurationBuilder()
              .SetBasePath(basePath)
              .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-             .AddJsonFile("local.settings.json", optional: false, reloadOnChange: true)
+             .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
              .AddEnvironmentVariables()
              .Build();
 

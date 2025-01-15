@@ -93,7 +93,7 @@ Write-Host -ForegroundColor Green "Getting AI Search account account key"
 $aiSearchKey = az search admin-key show --resource-group $resourceGroupName  --service-name $aiSearchName -o tsv --query primaryKey
 $docIntelligenceKey = az cognitiveservices account keys list --name $docIntelligenceAccountName --resource-group $resourceGroupName -o tsv --query key1
 
-if($openAiServiceName.Length -ne 0)
+if(($openAiEndpoint.Length -eq 0 -or $openAiKey.Length -eq 0) -and $openAiServiceName.Length -ne 0)
 {
     Write-Host -ForegroundColor Green "Getting OpenAI key and endpoint"
     $openAiKey =  az cognitiveservices account keys list --name $openAiServiceName --resource-group $resourceGroupName -o tsv --query key1

@@ -122,7 +122,10 @@ namespace DocumentQuestions.Console
                log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
             }
          }
-         log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
+         else
+         {
+            log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
+         }
       }
 
       internal static void ListAiSettings()

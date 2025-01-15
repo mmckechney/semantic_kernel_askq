@@ -20,7 +20,6 @@ This solution provides an example of how to process your own documents and then 
 - Added sample telemetry with [DocumentQuestionsLibrary/SkFunctionInvocationFilter.cs](DocumentQuestionsLibrary/SkFunctionInvocationFilter.cs) demonstrating how to intercept Semantic Kernel function invocation before and after execution of the function
 - Added OpenTelemetry configuration to the Console app and the Function if the `APPLICATIONINSIGHTS_CONNECTION_STRING` app setting is provided
 
-*NOTE:* I haven't updated the screen shots below with the lasted console app changes (nor have I fully tested the function app)
 
 ## What's Included
 
@@ -137,6 +136,10 @@ If you used the `deploy.ps1` script, the console app will be compiled and starte
 
    ![list command](images/list.png)
 
+- `clear-index` - clear index by name or `all`
+
+   ![clear-index](images/clear-index.png)
+
 - `ai list` - list the Azure OpenAI models configured for the app
 
    ![ai list command](images/ai-list.png)
@@ -144,6 +147,7 @@ If you used the `deploy.ps1` script, the console app will be compiled and starte
 - `ai set` - set the Azure OpenAI model to use for asking questions (these must already be deployed in your Azure AI instance)
 
    ![ai set command](images/ai-set.png)
+
 ### What's next?
 
 Try uploading your own documents and start asking question
