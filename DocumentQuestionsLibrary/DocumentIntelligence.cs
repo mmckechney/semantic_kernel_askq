@@ -17,6 +17,7 @@ namespace DocumentQuestions.Library
    {
       public static List<string> ModelList =
            [   "prebuilt-read",
+               "prebuild-layout",
                "prebuilt-mortgage.us.1003",
                "prebuilt-mortgage.us.1004",
                "prebuilt-mortgage.us.1005",

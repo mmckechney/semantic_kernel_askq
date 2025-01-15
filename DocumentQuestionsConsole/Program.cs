@@ -41,7 +41,7 @@ namespace DocumentQuestions.Console
          var config = new ConfigurationBuilder()
              .SetBasePath(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location))
              .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-             .AddJsonFile("local.settings.json", optional: false, reloadOnChange: true)
+             .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
              .AddEnvironmentVariables()
              .Build();
 
