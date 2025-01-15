@@ -29,7 +29,7 @@ namespace DocumentQuestions.Console
          askQuestionCommand.Handler = CommandHandler.Create<string[]>(Worker.AskQuestion);
 
          var fileOpt = new Option<string>(new string[]{ "--file", "-f" }, "Path to the file to process and index (surround with quotes if there are spaces in the name)") { IsRequired = true };
-         var modelOpt = new Option<string>(new string[] { "--model", "-m" }, () => "prebuilt-read", $"Model to use for processing the document: {string.Join(", ", DocumentIntelligence.ModelList)}");
+         var modelOpt = new Option<string>(new string[] { "--model", "-m" }, () => "prebuilt-layout", $"Model to use for processing the document: {string.Join(", ", DocumentIntelligence.ModelList)}");
          var indexNameOpt = new Option<string>(new string[] { "--index", "-i" }, $"Custom index name, otherwise it will default to the file name");
          var processFileCommand = new Command("process", "Process the file contents against Document Intelligence and add to Azure AI Search index")
          {

@@ -16,8 +16,8 @@ namespace DocumentQuestions.Library
    public class DocumentIntelligence
    {
       public static List<string> ModelList =
-           [   "prebuilt-read",
-               "prebuild-layout",
+            [ "prebuild-layout", 
+               "prebuilt-read",
                "prebuilt-mortgage.us.1003",
                "prebuilt-mortgage.us.1004",
                "prebuilt-mortgage.us.1005",
@@ -49,6 +49,10 @@ namespace DocumentQuestions.Library
          {
             indexName = Common.ReplaceInvalidCharacters(indexName);
          }
+         else
+         {
+            indexName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(file.Name).ToLower());
+         }
 
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
@@ -61,15 +65,11 @@ namespace DocumentQuestions.Library
          AnalyzeResult result = operation.Value;
          if (result != null)
          {
-            await common.WriteAnalysisContentToBlob(file.Name, 0, result.Content, log);
+            await common.WriteAnalysisContentToBlob(indexName, 0, result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
-            var contents = SplitDocumentIntoPagesAndParagraphs(result, file.Name);
+            var contents = SplitDocumentIntoPagesAndParagraphs(result, indexName);
             var taskList = new List<Task>();
 
-            if (string.IsNullOrWhiteSpace(indexName))
-            {
-               indexName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(file.Name).ToLower());
-            }
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
             taskList.Add(semanticUtility.StoreMemoryAsync(indexName, contents));
             taskList.Add(semanticUtility.StoreMemoryAsync("general", contents));
