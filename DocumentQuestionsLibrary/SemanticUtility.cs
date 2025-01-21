@@ -90,7 +90,16 @@ namespace DocumentQuestions.Library
 
       }
 
- 
+
+      public async IAsyncEnumerable<string> ExtractContentFromXmlDoc(string name, string xmlDocContent)
+      {
+         log.LogInformation("Creating Markdown from XML document...");
+         var result = kernel.InvokeStreamingAsync("YAMLPlugins", "XmltoMdExtraction", new() { { "content", xmlDocContent } });
+         await foreach (var item in result)
+         {
+            yield return item.ToString();
+         }
+      }
 
       public async Task<string> AskQuestion(string question, string documentContent)
       {

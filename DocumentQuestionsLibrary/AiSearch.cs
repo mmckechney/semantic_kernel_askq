@@ -24,7 +24,6 @@ namespace DocumentQuestions.Library
          string endpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration");
          string key = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration");
          // Create a client
-         //client = new SearchIndexClient(new Uri(endpoint), new DefaultAzureCredential());
          client = new SearchIndexClient(new Uri(endpoint), new AzureKeyCredential(key));
       }
       public async Task<List<string>> ListAvailableIndexes(bool unquoted = false)

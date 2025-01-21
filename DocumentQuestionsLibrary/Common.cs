@@ -32,6 +32,21 @@ namespace DocumentQuestions.Library
 
          }
       }
+
+      public static string SafeIndexName(string fileName, string customIndexName)
+      {
+         string safeIndexName = "";
+         if (!string.IsNullOrWhiteSpace(customIndexName))
+         {
+            safeIndexName = Common.ReplaceInvalidCharacters(customIndexName);
+         }
+         else
+         {
+            safeIndexName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(fileName).ToLower());
+         }
+         return safeIndexName;
+      }
+
       public static string ReplaceInvalidCharacters(string input)
       {
          input = Path.GetFileNameWithoutExtension(input).ToLower();

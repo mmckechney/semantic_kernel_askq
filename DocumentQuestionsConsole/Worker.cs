@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.CommandLine.Parsing;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using syS = System;
@@ -35,18 +36,18 @@ namespace DocumentQuestions.Console
 
       internal static async Task AskQuestion(string[] question)
       {
-         if(question == null || question.Length == 0)
+         if (question == null || question.Length == 0)
          {
             return;
          }
-         if(string.IsNullOrWhiteSpace(activeDocument))
+         if (string.IsNullOrWhiteSpace(activeDocument))
          {
             //log.LogInformation("Please use the 'doc' command to set an active document to start asking questions.", ConsoleColor.Yellow);
             return;
          }
          string quest = string.Join(" ", question);
          syS.Console.WriteLine("----------------------");
-         var docContent = await  semanticUtility.SearchForReleventContent(activeDocument, quest);
+         var docContent = await semanticUtility.SearchForReleventContent(activeDocument, quest);
          if (string.IsNullOrWhiteSpace(docContent))
          {
             log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
@@ -66,38 +67,38 @@ namespace DocumentQuestions.Console
 
       internal static async void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
       {
-         if(string.IsNullOrWhiteSpace(chatModel) && string.IsNullOrWhiteSpace(chatDeployment) && string.IsNullOrWhiteSpace(embedModel) && string.IsNullOrWhiteSpace(embedDeployment))
+         if (string.IsNullOrWhiteSpace(chatModel) && string.IsNullOrWhiteSpace(chatDeployment) && string.IsNullOrWhiteSpace(embedModel) && string.IsNullOrWhiteSpace(embedDeployment))
          {
             await rootParser.InvokeAsync("ai set -h");
             return;
          }
          bool changed = false;
-         if(!string.IsNullOrWhiteSpace(chatModel))
+         if (!string.IsNullOrWhiteSpace(chatModel))
          {
             config[Constants.OPENAI_CHAT_MODEL_NAME] = chatModel;
             log.LogInformation(new() { { "Set chat model to", ConsoleColor.DarkYellow }, { chatModel, ConsoleColor.Yellow } });
             changed = true;
          }
-         if(!string.IsNullOrWhiteSpace(chatDeployment))
+         if (!string.IsNullOrWhiteSpace(chatDeployment))
          {
             config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] = chatDeployment;
             log.LogInformation(new() { { "Set chat deployment to", ConsoleColor.DarkYellow }, { chatDeployment, ConsoleColor.Yellow } });
             changed = true;
          }
-         if(!string.IsNullOrWhiteSpace(embedModel))
+         if (!string.IsNullOrWhiteSpace(embedModel))
          {
             config[Constants.OPENAI_EMBEDDING_MODEL_NAME] = embedModel;
             log.LogInformation(new() { { "Set embedding model to", ConsoleColor.DarkYellow }, { embedModel, ConsoleColor.Yellow } });
             changed = true;
          }
-         if(!string.IsNullOrWhiteSpace(embedDeployment))
+         if (!string.IsNullOrWhiteSpace(embedDeployment))
          {
             config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] = embedDeployment;
             log.LogInformation(new() { { "Set embedding deployment to", ConsoleColor.DarkYellow }, { embedDeployment, ConsoleColor.Yellow } });
             changed = true;
          }
 
-         if(changed)
+         if (changed)
          {
             semanticUtility.InitMemoryAndKernel();
             ListAiSettings();
@@ -135,7 +136,7 @@ namespace DocumentQuestions.Console
          log.LogInformation("Azure OpenAI settings", ConsoleColor.Gray);
          log.LogInformation(new() { { "Chat Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_MODEL_NAME], ConsoleColor.Blue } });
          log.LogInformation(new() { { "Chat Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, {  config[Constants.OPENAI_EMBEDDING_MODEL_NAME], ConsoleColor.Blue } });
+         log.LogInformation(new() { { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_MODEL_NAME], ConsoleColor.Blue } });
          log.LogInformation(new() { { "Embedding Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME], ConsoleColor.Blue } });
          log.LogInformation("-------------------------------------");
 
@@ -145,11 +146,11 @@ namespace DocumentQuestions.Console
       internal async static Task<int> ListFiles(object t)
       {
          var names = await aiSearch.ListAvailableIndexes();
-         if(names.Count > 0)
+         if (names.Count > 0)
          {
             log.LogInformation("List of available documents:", ConsoleColor.Yellow);
          }
-         foreach(var name in names)
+         foreach (var name in names)
          {
             log.LogInformation(name);
          }
@@ -158,22 +159,45 @@ namespace DocumentQuestions.Console
 
       internal static async Task ProcessFile(string file, string model, string index)
       {
-         if(string.IsNullOrWhiteSpace(model))
+         if (string.IsNullOrWhiteSpace(model))
          {
             model = "prebuilt-read";
          }
-         if(file.Length == 0)
+         if (file.Length == 0)
          {
             log.LogInformation("Please enter a file name to process", ConsoleColor.Red);
             return;
          }
          string name = string.Join(" ", file);
-         if(!File.Exists(name))
+         if (!File.Exists(name))
          {
             log.LogInformation($"The file {name} doesn't exist. Please enter a valid file name", ConsoleColor.Red);
             return;
          }
-         await documentIntelligence.ProcessDocument(new FileInfo(name),model, index);
+
+         if (Path.GetExtension(file).ToLower() == ".xml")
+         {
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            StringBuilder sb = new();
+            var content = File.ReadAllText(name);
+            await foreach (var bit in semanticUtility.ExtractContentFromXmlDoc(name, content))
+            {
+               syS.Console.Write(bit);
+               sb.Append(bit);
+            }
+            sw.Stop();
+            syS.Console.WriteLine();
+            log.LogInformation($"Extraction time: {Math.Ceiling(sw.Elapsed.TotalSeconds)} seconds", ConsoleColor.Cyan);
+
+            string indexName = Common.SafeIndexName(file, index);
+            Dictionary<string, string> dict = new() { { name, sb.ToString() } };
+            await semanticUtility.StoreMemoryAsync(indexName, dict);
+            await semanticUtility.StoreMemoryAsync("general", dict);
+
+            return;
+         }
+         await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
       }
 
       internal static void SetActiveDocument(string[] document)
@@ -220,7 +244,7 @@ namespace DocumentQuestions.Console
                log.LogInformation("");
             }
 
-           
+
             syS.Console.Write("dq> ");
             var line = syS.Console.ReadLine();
             if (line == null)
