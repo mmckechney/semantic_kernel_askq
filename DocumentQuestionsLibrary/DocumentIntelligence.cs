@@ -43,16 +43,11 @@ namespace DocumentQuestions.Library
          this.common = common;
       }
 
+
       public async Task ProcessDocument(FileInfo file, string modelId, string indexName)
       {
-         if(!string.IsNullOrWhiteSpace(indexName))
-         {
-            indexName = Common.ReplaceInvalidCharacters(indexName);
-         }
-         else
-         {
-            indexName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(file.Name).ToLower());
-         }
+
+         indexName = Common.SafeIndexName(file.Name, indexName);
 
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
