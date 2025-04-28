@@ -61,6 +61,7 @@ namespace DocumentQuestions.Console
          }
 
          syS.Console.WriteLine();
+         //syS.Console.WriteLine("PLEASE NOTE: This does not constitue legal advice or counsel.");
          syS.Console.WriteLine("----------------------");
          syS.Console.WriteLine();
       }
@@ -188,6 +189,7 @@ namespace DocumentQuestions.Console
             }
             sw.Stop();
             syS.Console.WriteLine();
+            
             log.LogInformation($"Extraction time: {Math.Ceiling(sw.Elapsed.TotalSeconds)} seconds", ConsoleColor.Cyan);
 
             string indexName = Common.SafeIndexName(file, index);
@@ -197,7 +199,10 @@ namespace DocumentQuestions.Console
 
             return;
          }
-         await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
+         else
+         {
+            await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
+         }
       }
 
       internal static void SetActiveDocument(string[] document)

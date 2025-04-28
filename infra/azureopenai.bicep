@@ -34,7 +34,7 @@ resource chat 'Microsoft.CognitiveServices/accounts/deployments@2023-10-01-previ
     }
   }
   sku: {
-    name: 'Standard'
+    name: 'GlobalStandard'
     capacity: 100
   }
 }

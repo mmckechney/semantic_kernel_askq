@@ -10,7 +10,7 @@ param(
     [string] $openAIChatDeploymentName = "gpt-4o",
     [string] $openAIEmbeddingModel = "text-embedding-ada-002",
     [string] $openAIEmbeddingDeploymentName =  "text-embedding-ada-002",
-    [bool] $localCodeOnly = $false
+    [bool] $codeOnly = $false
 )
 
 $error.Clear()
@@ -79,15 +79,15 @@ else
        keyVaultName=$keyVaultName | ConvertFrom-Json -Depth 10
 
    if(!$?){ exit }
-
-
-   Push-Location -Path ./DocumentQuestionsFunction
-   Write-Host "Publishing $functionAppName to $resourceGroupName" -ForegroundColor Green
-   dotnet clean -c release
-   dotnet clean -c debug
-   func azure functionapp publish $functionAppName  --dotnet-isolated
-   Pop-Location
 }
+
+Push-Location -Path ./DocumentQuestionsFunction
+Write-Host "Publishing $functionAppName to $resourceGroupName" -ForegroundColor Green
+dotnet clean -c release
+dotnet clean -c debug
+func azure functionapp publish $functionAppName  --dotnet-isolated
+Pop-Location
+
 
 Write-Host -ForegroundColor Green "Getting AI Search account account key"
 $aiSearchKey = az search admin-key show --resource-group $resourceGroupName  --service-name $aiSearchName -o tsv --query primaryKey
