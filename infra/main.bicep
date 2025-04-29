@@ -9,18 +9,17 @@ param keyVaultName string
 param storageAccountName string
 param docIntelligenceAccountName string
 param aiSearchName string
-param openAIEndpoint string
-param openAIKey string
 param currentUserObjectId string
 param openAIChatModel string
 param openAIChatDeploymentName string
 param openAIEmbeddingDeploymentName string
 param openAIEmbeddingModel string
 param openAIServiceName string
-param openAILocation   string
-param deployOpenAI bool = true
+param openAILocation string
 
 
+
+var safeStorageAccountName = toLower(replace(storageAccountName, '-', ''))
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
     name: resourceGroupName
     location: location
@@ -32,9 +31,6 @@ module keyVault 'keyvault.bicep' = {
     params: {
         location: location
         keyVaultName: keyVaultName
-        openAiEndpoint : openAIEndpoint
-        openAiKey: openAIKey
-
     }
     dependsOn: [
         rg
@@ -71,7 +67,7 @@ module storageResources 'storage.bicep' = {
     name: 'storageResources'
     scope: resourceGroup(resourceGroupName)
     params: {
-        storageAccountName: storageAccountName
+        storageAccountName: safeStorageAccountName
         location: location
     }
     dependsOn: [
@@ -90,7 +86,7 @@ module functionResources 'function.bicep' = {
         openAIChatDeploymentName: openAIChatDeploymentName
         openAIEmbeddingModel: openAIEmbeddingModel
         openAIEmbeddingDeploymentName: openAIEmbeddingDeploymentName
-        storageAccountName: storageAccountName
+        storageAccountName: safeStorageAccountName
         extractedBlobContainerName: storageResources.outputs.extractedContainerName
         rawBlobContainerName: storageResources.outputs.rawContainerName
         keyVaultName: keyVaultName
@@ -117,7 +113,7 @@ module roleAssignments 'roleassignments.bicep' = {
     ]
 }
 
-module openAI 'azureopenai.bicep' = if (deployOpenAI) {
+module openAI 'azureopenai.bicep' = {
     name: 'azureOpenAI'
     scope: resourceGroup(resourceGroupName)
    params: {
@@ -153,11 +149,8 @@ resource user_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-
     }
 }
 
-
-  
-
-
 output docIntelEndpoint string = docIntelligence.outputs.docIntelEndpoint
 output extractedContainerName string = storageResources.outputs.extractedContainerName
 output rawContainerName string = storageResources.outputs.rawContainerName
+output aiSearchEndpoint string = aiSearch.outputs.aiSearchEndpoint
 

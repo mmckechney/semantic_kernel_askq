@@ -5,7 +5,8 @@
 		<OutputType>Exe</OutputType>
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<RootNamespace>DocumentQuestions.Function</RootNamespace>
-	</PropertyGroup>
+	  <UserSecretsId>95c45569-a700-4ac8-9860-79dc624e4a44</UserSecretsId>
+  </PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Azure.AI.FormRecognizer" Version="4.1.0" />
 		<!--<PackageReference Include="Azure.Data.Tables" Version="12.9.1" />-->
