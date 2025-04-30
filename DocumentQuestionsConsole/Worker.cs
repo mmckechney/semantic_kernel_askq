@@ -162,7 +162,7 @@ namespace DocumentQuestions.Console
       {
          if (string.IsNullOrWhiteSpace(model))
          {
-            model = "prebuilt-read";
+            model = "prebuilt-layout";
          }
          if (file.Length == 0)
          {
@@ -193,9 +193,10 @@ namespace DocumentQuestions.Console
             log.LogInformation($"Extraction time: {Math.Ceiling(sw.Elapsed.TotalSeconds)} seconds", ConsoleColor.Cyan);
 
             string indexName = Common.SafeIndexName(file, index);
-            Dictionary<string, string> dict = new() { { name, sb.ToString() } };
-            await semanticUtility.StoreMemoryAsync(indexName, dict);
-            await semanticUtility.StoreMemoryAsync("general", dict);
+            string fileName = Common.BaseFileName(file);
+            List<string> contentlst = new() {  name, sb.ToString() };
+            await semanticUtility.StoreMemoryAsync(indexName, fileName, contentlst);
+            await semanticUtility.StoreMemoryAsync("general", fileName, contentlst);
 
             return;
          }

@@ -42,9 +42,38 @@ namespace DocumentQuestions.Library
          }
          else
          {
-            safeIndexName = Common.ReplaceInvalidCharacters(Path.GetFileNameWithoutExtension(fileName).ToLower());
+
+            Uri uri;
+            if (Uri.TryCreate(fileName, UriKind.RelativeOrAbsolute, out uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
+            {
+               // It's a URL
+               fileName =  Path.GetFileNameWithoutExtension(uri.AbsolutePath);
+            }
+            else
+            {
+               // It's a local file path
+               fileName = Path.GetFileNameWithoutExtension(fileName);
+            }
+            safeIndexName = Common.ReplaceInvalidCharacters(fileName.ToLower());
          }
          return safeIndexName;
+      }
+
+      public static string BaseFileName(string filePathOrUrl)
+      {
+         string fileName;
+         Uri uri;
+         if (Uri.TryCreate(filePathOrUrl, UriKind.RelativeOrAbsolute, out uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
+         {
+            // It's a URL
+            fileName = Path.GetFileNameWithoutExtension(uri.AbsolutePath);
+         }
+         else
+         {
+            // It's a local file path
+            fileName = Path.GetFileNameWithoutExtension(filePathOrUrl);
+         }
+         return fileName;
       }
 
       public static string ReplaceInvalidCharacters(string input)
@@ -133,30 +162,22 @@ namespace DocumentQuestions.Library
       }
 
 
-      public string GetFileName(string name, int counter)
+      public string GetFileName(string name)
       {
          string nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
          string newName = nameWithoutExtension.Replace(".", "_");
-         newName += $"_{counter.ToString().PadLeft(4, '0')}.json";
+         newName += $".md";
          return newName;
       }
 
-      public async Task<bool> WriteAnalysisContentToBlob(string name, int counter, string content, ILogger log)
+      public async Task<bool> WriteAnalysisContentToBlob(string name, string content, ILogger log)
       {
          try
          {
-            string newName = GetFileName(name, counter);
+            string newName = GetFileName(name);
             string blobName = Path.GetFileNameWithoutExtension(name) + "/" + newName;
 
-            var jsonObj = new ProcessedFile
-            {
-               FileName = name,
-               BlobName = blobName,
-               Content = content
-            };
-            string jsonStr = JsonSerializer.Serialize(jsonObj);
-
-            // Save the JSON string to Azure Blob Storage  
+            
             string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
             string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
 
@@ -168,14 +189,14 @@ namespace DocumentQuestions.Library
 
             using (var stream = new MemoryStream())
             {
-               byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(jsonStr);
-               stream.Write(jsonBytes, 0, jsonBytes.Length);
+               byte[] contentBytes = System.Text.Encoding.UTF8.GetBytes(content);
+               stream.Write(contentBytes, 0, contentBytes.Length);
                stream.Seek(0, SeekOrigin.Begin);
                await blobClient.UploadAsync(stream, overwrite: true);
 
             }
 
-            log.LogInformation($"JSON file {newName} saved to Azure Blob Storage.");
+            log.LogInformation($"Markdown file {newName} saved to Azure Blob Storage.");
             return true;
 
          }

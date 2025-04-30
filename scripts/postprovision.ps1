@@ -72,13 +72,22 @@ $localSettings[$json.OPENAI_ENDPOINT] = $appSettingsHash[$json.OPENAI_ENDPOINT]
 $localSettings[$json.OPENAI_KEY] = $appSettingsHash[$json.OPENAI_KEY]
 $localSettings[$json.DOCUMENTINTELLIGENCE_KEY] = $appSettingsHash[$json.DOCUMENTINTELLIGENCE_KEY]
 $localSettings[$json.AISEARCH_KEY] = $appSettingsHash[$json.AISEARCH_KEY]
+$localSettings["AzureWebJobsStorage"]= "UseDevelopmentStorage=true"
+$localSettings["FUNCTIONS_EXTENSION_VERSION"]= "~4"
+$localSettings["FUNCTIONS_WORKER_RUNTIME"]= "dotnet-isolated"
+$localSettings["WEBSITE_RUN_FROM_PACKAGE"]= "1"
 
 Write-Host $localSettings | ConvertTo-Json -Depth 10
+
+$funcSettings = @{
+    "IsEncrypted" = $false
+    "Values" = $localSettings
+}
 
 $funcDirPath = "./DocumentQuestionsFunction"
 if (Test-Path $funcDirPath) {
     # Save local settings to file
-    $localSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath "$funcDirPath/local.settings.json"
+    $funcSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath "$funcDirPath/local.settings.json"
     Write-Host "Created $funcDirPath/local.settings.json for DocumentQuestionsConsole"
 } else {
     Write-Warning "Directory $funcDirPath not found. Skipping local.settings.json creation."

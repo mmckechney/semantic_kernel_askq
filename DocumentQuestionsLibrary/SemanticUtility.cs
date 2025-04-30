@@ -22,7 +22,6 @@ namespace DocumentQuestions.Library
       ILogger<SemanticUtility> log;
       IConfiguration config;
       ILoggerFactory logFactory;
-      bool usingVolatileMemory = false;
       Common common;
       IFunctionInvocationFilter skInvocationFilter;
       public SemanticUtility(ILoggerFactory logFactory, IConfiguration config, Common common, IFunctionInvocationFilter skInvocationFilter)
@@ -119,39 +118,33 @@ namespace DocumentQuestions.Library
       }
 
   
-      public async Task StoreMemoryAsync(string collectionName, Dictionary<string, string> docFile)
+      public async Task StoreMemoryAsync(string collectionName, string filename, List<string> contents)
       {
          collectionName = Common.ReplaceInvalidCharacters(collectionName);
          log.LogInformation($"Storing memory to AI Search collection '{collectionName}'...");
          var i = 0;
-         foreach (var entry in docFile)
+         foreach (var entry in contents)
          {
-            if(!string.IsNullOrWhiteSpace(entry.Value))
+            if(!string.IsNullOrWhiteSpace(entry))
             {
                await semanticMemory.SaveReferenceAsync(
                collection: collectionName,
                externalSourceName: "BlobStorage",
-               externalId: entry.Key,
-               description: entry.Value,
-               text: entry.Value);
+               externalId: filename,
+               description: entry,
+               text: entry);
 
                log.LogDebug($" #{++i} saved to {collectionName}.");
             }
             else
             {
-               log.LogWarning($"The contents of {entry.Key} was empty. Unable to save to the index {collectionName}");
+               log.LogWarning($"The contents of {filename} was empty. Unable to save to the index {collectionName}");
             }
            
          }
       }
       public async Task<IAsyncEnumerable<MemoryQueryResult>> SearchMemoryAsync(string collectionName, string query)
       {
-         //If using Volatile Memory, first need to re-populate memory from Blob storage
-         if (usingVolatileMemory)
-         {
-            var docFile = await common.GetBlobContentDictionaryAsync(collectionName);
-            await StoreMemoryAsync(collectionName, docFile);
-         }
 
          log.LogDebug("\nQuery: " + query + "\n");
 

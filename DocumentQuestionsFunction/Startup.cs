@@ -102,13 +102,14 @@ namespace DocumentQuestions.Function
          services.AddSingleton<SemanticUtility>();
          services.AddSingleton<Helper>();
          services.AddSingleton<IFunctionInvocationFilter, SkFunctionInvocationFilter>();
-         services.AddSingleton(sp =>
-         {
-            var config = sp.GetRequiredService<IConfiguration>();
-            var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
-            var key = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
-            return new DocumentIntelligenceClient(endpoint, new AzureKeyCredential(key));
-         });
+         services.AddSingleton<DocumentQuestions.Library.DocumentIntelligence>();
+         //services.AddSingleton(sp =>
+         //{
+         //   var config = sp.GetRequiredService<IConfiguration>();
+         //   var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
+         //   var key = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
+         //   return new DocumentIntelligenceClient(endpoint, new AzureKeyCredential(key));
+         //});
          services.AddHttpClient();
 
       }
