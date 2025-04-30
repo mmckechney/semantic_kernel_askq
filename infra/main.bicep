@@ -15,8 +15,6 @@ param openAIChatDeploymentName string
 param openAIEmbeddingDeploymentName string
 param openAIEmbeddingModel string
 param openAIServiceName string
-param openAILocation string
-
 
 
 var safeStorageAccountName = toLower(replace(storageAccountName, '-', ''))
@@ -117,7 +115,7 @@ module openAI 'azureopenai.bicep' = {
     name: 'azureOpenAI'
     scope: resourceGroup(resourceGroupName)
    params: {
-    location: openAILocation
+    location: location
     name: openAIServiceName
     chatModel: openAIChatModel
     chatDeploymentName: openAIChatDeploymentName
