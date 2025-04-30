@@ -52,6 +52,9 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   identity: {
     type: 'SystemAssigned'
   }
+  tags: {
+    'azd-service-name': 'documentquestionsfunction'
+  }
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {

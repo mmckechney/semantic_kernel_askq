@@ -73,6 +73,11 @@ artifacts/
 *.svclog
 *.scc
 
+__azurite*.json
+__blobstorage__
+__queuestorage__
+__tablestorage__
+
 # Chutzpah Test files
 _Chutzpah*
 
@@ -264,3 +269,4 @@ __pycache__/
 *.pyc
 .azure
 /Properties/launchSettings.json
+

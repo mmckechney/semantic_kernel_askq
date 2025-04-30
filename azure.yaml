@@ -1,0 +1,38 @@
+name: document-questions
+metadata:
+  template: custom
+
+services:
+  documentquestionsfunction:
+    project: ./DocumentQuestionsFunction/
+    language: csharp
+    host: function
+       
+    
+infra:
+  bicep: ./infra/main.bicep
+  parameters:
+    location: $(AZURE_LOCATION)
+    resourceGroupName: $(AZURE_RESOURCEGROUP_NAME)
+    functionAppName: $(AZURE_FUNCTIONAPP_NAME)
+    keyVaultName: $(AZURE_KEYVAULT_NAME)
+    storageAccountName: $(AZURE_STORAGEACCT_NAME)
+    docIntelligenceAccountName: $(AZURE_DOCUMENTINTELLIGENCE_ACCOUNT_NAME)
+    aiSearchName: $(AZURE_AISEARCH_NAME)
+    openAILocation: $(AZURE_OPENAI_LOCATION)
+    openAIServiceName: $(AZURE_OPENAI_SERVICE_NAME)
+    openAIChatModel: $(AZURE_OPENAI_CHAT_MODEL)
+    openAIChatDeploymentName: $(AZURE_OPENAI_CHAT_DEPLOYMENT_NAME)
+    openAIEmbeddingModel: $(AZURE_OPENAI_EMBEDDING_MODEL)
+    openAIEmbeddingDeploymentName: $(AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME)
+    deployOpenAI: true
+    currentUserObjectId: $(AZURE_CURRENT_USER_OBJECT_ID)
+
+hooks:
+  preup: 
+    - shell: pwsh
+      run: ./scripts/preup.ps1
+  
+  postdeploy:
+    - shell: pwsh
+      run: ./scripts/postdeploy.ps1

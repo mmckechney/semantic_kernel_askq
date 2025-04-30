@@ -28,7 +28,7 @@ This solution provides an example of how to process your own documents and then 
  - C# function app which has 3 functions:
 
      1. `HttpTriggerUploadFile` - upload documents to an Azure Storage account via a REST Api
-     2. `BlobTriggerProcessFile` - detects the uploaded document and processes it through [Azure Cognitive Services Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?view=doc-intel-3.1.0) into one or more JSON files (depending on the size of the document)
+     2. `BlobTriggerProcessFile` - detects the uploaded document and processes it through [Azure Cognitive Services Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?view=doc-intel-3.1.0) into one or more Markdown files (depending on the size of the document)
      3. `HttpTriggerSemanticKernelAskQuestion` - REST Api to ask questions about the document using Semantic Kernel SDK
 
 - A console app to easily run and test locally
@@ -42,26 +42,29 @@ This solution provides an example of how to process your own documents and then 
 
 ### Deploying
 
-Deployment is automated using PowerShell, the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/) and [Bicep](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/).\
-To run the script, you will need to select an Azure location for deployment, the Azure Open AI endpoint and key and pick a name for the function (this must be a globally unique name and less than 10 characters).
+Deployment is automated using PowerShell, the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/) and the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/). These can be easily installed on a Windows machine using `winget`:
 
-By default, the script will deploy an [Azure Cognitive Search](https://azure.microsoft.com/en-us/services/search/) instance and use it to store the results of the document processing and searching. If you do not want to deploy Azure Cognitive Search, you can use the `-useCognitiveSeach $false` parameter option to skip the deployment of Azure Cognitive Search and only use the `extracted` blob container to store the results of the document processing.
+``` bash
+winget install --id "Microsoft.AzureCLI" --silent --accept-package-agreements --accept-source-agreements
+winget install --id "Microsoft.Azd" --silent --accept-package-agreements --accept-source-agreements
+```
 
-**NOTE:** If deploying a new Azure OpenAI instance, be aware there are location limitations base on model. Please set your `openAiLocation` value accordingly: 
+**NOTE:** Since you will be deploying a new Azure OpenAI instance, be aware there are location limitations base on model. Please set your location value accordingly: 
 [Region Availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#model-summary-table-and-region-availability)
 
 Also, depending on your availble Azure OpenAI model quota, you may get a capacity related deployment error. If you do, you will need to modify the `capacity` value for the appropriate model found in the [`infra/azureopenai.bicep`](infra/azureopenai.bicep) file
 
 
 ``` powershell
-# obtain an Azure access token
-az login
+# Login to the Azure Developer CLI
+azd auth login  
+#if you have access to multiple tenants, you may want to specify the tenant id
+azd auth login --tenant-id "<tenant guid"
 
-# deploy the solution - creating a new Azure OpenAI Service (note the separate item for OpenAI Location as there are some restrictions for this service)
-.\deploy.ps1 -functionAppName  <function name>  -location <azure location> -openAILocation <openai key>
+# provision the resources
+azd up
 
-# OR.. reusing an existing Azure Open AI Service
-.\deploy.ps1 -functionAppName  <function name>  -openAiEndpoint <http endpoint value> -openAiKey <openai key> -location <azure location>
+#follow the prompts for the parameter values...
 ```
 
 If successful, this process will create:
@@ -80,7 +83,7 @@ If successful, this process will create:
 
 1. Upload a document using the `HttpTriggerUploadFile` REST API. 
 For this example, download and use [US Declaration of Independence as a PDF file](https://uscode.house.gov/download/annualhistoricalarchives/pdf/OrganicLaws2006/decind.pdf)
-2. Once the file i uploaded, the `BlobTriggerProcessFile` will automatically trigger, process it with Document Intelligence and create a new folder called `decind` in the `extracted` blob container and save 3 JSON files.
+2. Once the file i uploaded, the `BlobTriggerProcessFile` will automatically trigger, process it with Document Intelligence and create a new folder called `decind` in the `extracted` blob container and save 3 Markdown files.
 
 3. Ask questions using the `HttpTriggerSemanticKernelAskQuestion` function - this uses semantic config to only load max of 2 pages to reduce tokens provided to Azure OpenAI.
 
@@ -110,9 +113,13 @@ For this example, download and use [US Declaration of Independence as a PDF file
 
 ### Running Samples via Console App
 
-If you used the `deploy.ps1` script, the console app will be compiled and started automatically. Otherwise, you can run the console app by opening the `DocumentQuestionsFunction.sln` in Visual Studio or VS Code and running the `DocumentQuestionsConsole` project.
+Along with the Azure deployment, the azd command will configure the local.settings.json file for the console app and the local funciton. To run the console app:
 
-1. Open the console app. If this is your first time running the app or the Functions, you will not have any documents processed and you will be prompted to upload a document with the `process` 
+``` bash
+dotnet run --project ./DocumentQuestionsConsole/DocumentQuestionsConsole.csproj
+```
+
+1. If this is your first time running the app or the Functions, you will not have any documents processed and you will be prompted to upload a document with the `process` 
 
    ![first time running the app](images/first-run.png)
 

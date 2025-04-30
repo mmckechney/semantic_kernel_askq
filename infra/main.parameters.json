@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "resourceGroupName": {
+      "value": "${AZURE_RESOURCEGROUP_NAME}"
+    },
+    "functionAppName": {
+      "value": "${AZURE_FUNCTIONAPP_NAME}"
+    },
+    "keyVaultName": {
+      "value": "${AZURE_KEYVAULT_NAME}"
+    },
+    "storageAccountName": {
+      "value": "${AZURE_STORAGEACCT_NAME}"
+    },
+    "docIntelligenceAccountName": {
+      "value": "${AZURE_DOCUMENTINTELLIGENCE_ACCOUNT_NAME}"
+    },
+    "aiSearchName": {
+      "value": "${AZURE_AISEARCH_NAME}"
+    },
+    "openAILocation": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "openAIServiceName": {
+      "value": "${AZURE_OPENAI_SERVICE_NAME}"
+    },
+    "openAIChatModel": {
+      "value": "${AZURE_OPENAI_CHAT_MODEL}"
+    },
+    "openAIChatDeploymentName": {
+      "value": "${AZURE_OPENAI_CHAT_DEPLOYMENT_NAME}"
+    },
+    "openAIEmbeddingModel": {
+      "value": "${AZURE_OPENAI_EMBEDDING_MODEL}"
+    },
+    "openAIEmbeddingDeploymentName": {
+      "value": "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME}"
+    },
+    "currentUserObjectId": {
+      "value": "${AZURE_CURRENT_USER_OBJECT_ID}"
+    }
+  }
+}

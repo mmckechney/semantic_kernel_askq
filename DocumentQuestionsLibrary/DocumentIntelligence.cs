@@ -9,6 +9,8 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using Microsoft.SemanticKernel.Text;
+using YamlDotNet.Serialization;
 
 namespace DocumentQuestions.Library
 {
@@ -34,108 +36,148 @@ namespace DocumentQuestions.Library
       private SemanticUtility semanticUtility;
       private Common common;
 
-      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, DocumentIntelligenceClient docIntelClient, Common common)
+      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, Common common)
       {
          this.log = log;
          this.config = config;
-         this.docIntelClient = docIntelClient;
          this.semanticUtility = semanticUtility;
          this.common = common;
+
+         try
+         {
+            var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
+            var key = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
+            this.docIntelClient = new DocumentIntelligenceClient(endpoint, new AzureKeyCredential(key));
+         }catch(Exception exe)
+         {
+            log.LogError(exe.ToString() );
+         }
       }
 
 
-      public async Task ProcessDocument(FileInfo file, string modelId, string indexName)
+      public async Task ProcessDocument(Uri fileUri, string modelId = "prebuilt-layout", string indexName = "")
       {
-
-         indexName = Common.SafeIndexName(file.Name, indexName);
-
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
+
+            log.LogInformation($"Analyzing document with model ID: {modelId} ");
+            AnalyzeDocumentOptions opts = new AnalyzeDocumentOptions(modelId: modelId, uriSource: fileUri)
+            {
+               OutputContentFormat = DocumentContentFormat.Markdown
+            };
+            operation = await docIntelClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, opts);
+         AnalyzeResult result = operation.Value;
+         await ProcessDocumentResults(result, fileUri.AbsoluteUri, indexName);
+      }
+
+      public async Task ProcessDocument(FileInfo file, string modelId = "prebuilt-layout", string indexName = "")
+      {
+         //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
+         Operation<AnalyzeResult> operation;
+
          using (FileStream stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read))
          {
             log.LogInformation($"Analyzing document with model ID: {modelId} ");
-            BinaryData document = BinaryData.FromStream(stream);
-            operation = await docIntelClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, modelId, document);
+            BinaryData binaryDoc = BinaryData.FromStream(stream);
+            AnalyzeDocumentOptions opts = new AnalyzeDocumentOptions(modelId: modelId, bytesSource: binaryDoc)
+            {
+               OutputContentFormat = DocumentContentFormat.Markdown
+            };
+            operation = await docIntelClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, opts);
          }
          AnalyzeResult result = operation.Value;
+
+         await ProcessDocumentResults(result, file.FullName, indexName);
+      }
+
+      public async Task ProcessDocumentResults(AnalyzeResult result, string filePathOrUrl, string indexName)
+      {
+
+         indexName = Common.SafeIndexName(filePathOrUrl, indexName);
+
          if (result != null)
          {
-            await common.WriteAnalysisContentToBlob(indexName, 0, result.Content, log);
+            string content = result.Content;
+            var contentLines = content.Split(Environment.NewLine).ToList();
+           
+
+            log.LogInformation($"Writing document Markdown to bloc...");
+            await common.WriteAnalysisContentToBlob(indexName,result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
-            var contents = SplitDocumentIntoPagesAndParagraphs(result, indexName);
+            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, 8191);
             var taskList = new List<Task>();
 
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
-            taskList.Add(semanticUtility.StoreMemoryAsync(indexName, contents));
-            taskList.Add(semanticUtility.StoreMemoryAsync("general", contents));
+            taskList.Add(semanticUtility.StoreMemoryAsync(indexName, Common.BaseFileName(filePathOrUrl), chunked));
+            taskList.Add(semanticUtility.StoreMemoryAsync("general", Common.BaseFileName(filePathOrUrl), chunked));
             Task.WaitAll(taskList.ToArray());
          }
          log.LogInformation("Document Processed and Indexed");
 
       }
    
-      private Dictionary<string, string> SplitDocumentIntoPagesAndParagraphs(AnalyzeResult result, string fileName)
-      {
-         var content = "";
-         bool contentFound = false;
-         var taskList = new List<Task>();
-         var docContent = new Dictionary<string, string>();
+      //private Dictionary<string, string> SplitDocumentIntoPagesAndParagraphs(AnalyzeResult result, string fileName)
+      //{
+      //   var content = "";
+      //   bool contentFound = false;
+      //   var taskList = new List<Task>();
+      //   var docContent = new Dictionary<string, string>();
 
-         //Split by page if there is content...
-         log.LogInformation("Checking document data...");
-         foreach (DocumentPage page in result.Pages)
-         {
+      //   //Split by page if there is content...
+      //   log.LogInformation("Checking document data...");
+      //   foreach (DocumentPage page in result.Pages)
+      //   {
 
-            for (int i = 0; i < page.Lines.Count; i++)
-            {
-               DocumentLine line = page.Lines[i];
-               log.LogDebug($"  Line {i} has content: '{line.Content}'.");
-               content += line.Content.ToString();
-               contentFound = true;
-            }
+      //      for (int i = 0; i < page.Lines.Count; i++)
+      //      {
+      //         DocumentLine line = page.Lines[i];
+      //         log.LogDebug($"  Line {i} has content: '{line.Content}'.");
+      //         content += line.Content.ToString();
+      //         contentFound = true;
+      //      }
 
-            if (!string.IsNullOrEmpty(content))
-            {
-               log.LogDebug("content = " + content);
-               taskList.Add(common.WriteAnalysisContentToBlob(fileName, page.PageNumber, content, log));
-               docContent.Add(GetFileName(fileName, page.PageNumber), content);
-            }
-            content = "";
-         }
+      //      if (!string.IsNullOrEmpty(content))
+      //      {
+      //         log.LogDebug("content = " + content);
+      //         taskList.Add(common.WriteAnalysisContentToBlob(fileName, page.PageNumber, content, log));
+      //         docContent.Add(GetFileName(fileName, page.PageNumber), content);
+      //      }
+      //      content = "";
+      //   }
 
-         //Otherwise, split by collected paragraphs
-         content = "";
-         if (!contentFound && result.Paragraphs != null)
-         {
-            var counter = 0;
-            foreach (DocumentParagraph paragraph in result.Paragraphs)
-            {
+      //   //Otherwise, split by collected paragraphs
+      //   content = "";
+      //   if (!contentFound && result.Paragraphs != null)
+      //   {
+      //      var counter = 0;
+      //      foreach (DocumentParagraph paragraph in result.Paragraphs)
+      //      {
 
-               if (paragraph != null && !string.IsNullOrWhiteSpace(paragraph.Content))
-               {
-                  if (content.Length + paragraph.Content.Length < 4000)
-                  {
-                     content += paragraph.Content + Environment.NewLine;
-                  }
-                  else
-                  {
-                     taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
-                     docContent.Add(GetFileName(fileName, counter), content);
-                     counter++;
+      //         if (paragraph != null && !string.IsNullOrWhiteSpace(paragraph.Content))
+      //         {
+      //            if (content.Length + paragraph.Content.Length < 4000)
+      //            {
+      //               content += paragraph.Content + Environment.NewLine;
+      //            }
+      //            else
+      //            {
+      //               taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
+      //               docContent.Add(GetFileName(fileName, counter), content);
+      //               counter++;
 
-                     content = paragraph.Content + Environment.NewLine;
-                  }
-               }
+      //               content = paragraph.Content + Environment.NewLine;
+      //            }
+      //         }
 
-            }
+      //      }
 
-            //Add the last paragraph
-            taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
-            docContent.Add(GetFileName(fileName, counter), content);
-         }
+      //      //Add the last paragraph
+      //      taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
+      //      docContent.Add(GetFileName(fileName, counter), content);
+      //   }
 
-         return docContent;
-      }
+      //   return docContent;
+      //}
 
       private string GetFileName(string name, int counter)
       {
