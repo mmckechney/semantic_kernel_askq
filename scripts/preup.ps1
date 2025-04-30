@@ -6,7 +6,10 @@ if (-not $currentUserObjectId) {
     Write-Error "Failed to get current user object ID. Make sure you're logged into Azure CLI."
     exit 1
 }
-$envName = $(azd env get-values --output json | ConvertFrom-Json).AZURE_ENV_NAME
+
+$envValues = azd env get-values --output json | ConvertFrom-Json
+$AZURE_LOCATION = $envValues.AZURE_LOCATION
+$envName = $envValues.AZURE_ENV_NAME
 $safeEnvName = $envName -replace '[^a-zA-Z0-9]', ''
 
 # Path to .env file
@@ -43,3 +46,10 @@ Set-EnvironmentVariable -Name "AZURE_OPENAI_SERVICE_NAME" -Value "$envName-opena
 Write-Host "Writing environment variables to .env file at $envFilePath"
 $envContent | Out-File -FilePath $envFilePath -Encoding utf8 -Force
 Write-Host ".env file created/updated successfully."
+
+
+Write-Host "Creating function code package"
+Push-Location -Path ./DocumentQuestionsFunction
+dotnet publish -c Release -o ./publish --runtime win-x64 --self-contained false
+Pop-Location
+

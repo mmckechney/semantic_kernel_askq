@@ -4,10 +4,11 @@ metadata:
 
 services:
   documentquestionsfunction:
-    project: ./DocumentQuestionsFunction
-    language: dotnet
+    project: ./DocumentQuestionsFunction/
+    language: csharp
     host: function
-
+       
+    
 infra:
   bicep: ./infra/main.bicep
   parameters:
@@ -28,10 +29,10 @@ infra:
     currentUserObjectId: $(AZURE_CURRENT_USER_OBJECT_ID)
 
 hooks:
-  preprovision:
+  preup: 
     - shell: pwsh
-      run: ./scripts/preprovision.ps1
+      run: ./scripts/preup.ps1
   
-  postprovision:
+  postdeploy:
     - shell: pwsh
-      run: ./scripts/postprovision.ps1
+      run: ./scripts/postdeploy.ps1
