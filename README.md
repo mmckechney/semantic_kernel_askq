@@ -62,7 +62,7 @@ azd auth login
 azd auth login --tenant-id "<tenant guid"
 
 # provision the resources
-azd provision
+azd up
 
 #follow the prompts for the parameter values...
 ```
