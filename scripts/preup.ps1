@@ -47,9 +47,3 @@ Write-Host "Writing environment variables to .env file at $envFilePath"
 $envContent | Out-File -FilePath $envFilePath -Encoding utf8 -Force
 Write-Host ".env file created/updated successfully."
 
-
-Write-Host "Creating function code package"
-Push-Location -Path ./DocumentQuestionsFunction
-dotnet publish -c Release -o ./publish --runtime win-x64 --self-contained false
-Pop-Location
-
