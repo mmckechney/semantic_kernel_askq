@@ -1,122 +1,128 @@
-﻿using Azure;
-using Azure.AI.DocumentIntelligence;
+﻿#nullable enable
+
 using Azure.Monitor.OpenTelemetry.Exporter;
 using DocumentQuestions.Library;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 
-namespace DocumentQuestions.Function
+namespace DocumentQuestions.Function;
+
+internal static class Startup
 {
-   internal class Startup
+   private const string ServiceName = "DocumentQuestions.Function";
+
+   private static readonly string[] AiSources =
+   [
+      "Microsoft.Agents.AI*",
+      "Microsoft.Extensions.AI*",
+   ];
+
+   static async Task Main(string[] args)
    {
-      static async Task Main(string[] args)
+      var basePath = ResolveBasePath();
+
+      var config = new ConfigurationBuilder()
+         .SetBasePath(basePath)
+         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+         .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+         .AddEnvironmentVariables()
+         .Build();
+
+      var connectionString = config.GetValue<string?>(Constants.APPLICATIONINSIGHTS_CONNECTION_STRING);
+      ResourceBuilder? resourceBuilder = null;
+
+      if (!string.IsNullOrWhiteSpace(connectionString))
       {
-         string basePath = IsDevelopmentEnvironment() ?
-             Environment.GetEnvironmentVariable("AzureWebJobsScriptRoot") :
-             $"{Environment.GetEnvironmentVariable("HOME")}\\site\\wwwroot";
+         resourceBuilder = ResourceBuilder
+            .CreateDefault()
+            .AddService(ServiceName);
 
+         using var traceProvider = Sdk.CreateTracerProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddSource(AiSources)
+            .AddAzureMonitorTraceExporter(options => options.ConnectionString = connectionString)
+            .Build();
 
-         // Build the configuration
-         var config = new ConfigurationBuilder()
-             .SetBasePath(basePath)
-             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-             .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-             .AddEnvironmentVariables()
-             .Build();
+         using var meterProvider = Sdk.CreateMeterProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddMeter(AiSources)
+            .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
+            .Build();
+      }
 
+      var builder = new HostBuilder();
 
-         var connectionString = config.GetValue<string>(Constants.APPLICATIONINSIGHTS_CONNECTION_STRING);//?? throw new ArgumentException($"Missing {Constants.APPLICATIONINSIGHTS_CONNECTION_STRING} in configuration");
-         ResourceBuilder resourceBuilder = null;
+      builder.ConfigureLogging((_, logging) =>
+      {
+         logging.SetMinimumLevel(LogLevel.Debug);
+         logging.AddFilter("System", LogLevel.Warning);
+         logging.AddFilter("Microsoft", LogLevel.Warning);
+
          if (!string.IsNullOrWhiteSpace(connectionString))
          {
-            resourceBuilder = ResourceBuilder
-                .CreateDefault()
-                .AddService("DocumentQuestions.Function");
-
-            // Enable model diagnostics with sensitive data.
-            AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
-
-            using var traceProvider = Sdk.CreateTracerProviderBuilder()
-                .SetResourceBuilder(resourceBuilder)
-                .AddSource("Microsoft.SemanticKernel*")
-                .AddAzureMonitorTraceExporter(options => options.ConnectionString = connectionString)
-                .Build();
-
-            using var meterProvider = Sdk.CreateMeterProviderBuilder()
-                .SetResourceBuilder(resourceBuilder)
-                .AddMeter("Microsoft.SemanticKernel*")
-                .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
-                .Build();
-         }
-
-         var builder = new HostBuilder();
-         builder.ConfigureLogging((hostContext, logging) =>
-         {
-            logging.SetMinimumLevel(LogLevel.Debug);
-            logging.AddFilter("System", LogLevel.Warning);
-            logging.AddFilter("Microsoft", LogLevel.Warning);
-            if (!string.IsNullOrWhiteSpace(connectionString))
+            logging.AddOpenTelemetry(options =>
             {
-               logging.AddOpenTelemetry(options =>
+               if (resourceBuilder is not null)
                {
                   options.SetResourceBuilder(resourceBuilder);
-                  options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
-                  // Format log messages. This is default to false.
-                  options.IncludeFormattedMessage = true;
-                  options.IncludeScopes = true;
-               });
-            }
+               }
 
-         });
-         builder.ConfigureFunctionsWorkerDefaults();
-         builder.ConfigureAppConfiguration(b =>
-         {
-            b.SetBasePath(basePath)
-              .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)  // common settings go here.
-              .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT")}.json", optional: true, reloadOnChange: false)  // environment specific settings go here
-              .AddJsonFile("local.settings.json", optional: true, reloadOnChange: false)  // secrets go here. This file is excluded from source control.
-              .AddEnvironmentVariables()
-              .Build();
+               options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
+               options.IncludeFormattedMessage = true;
+               options.IncludeScopes = true;
+            });
+         }
+      });
 
-         });
-         // builder.AddAzureStorage();
+      builder.ConfigureFunctionsWorkerDefaults();
 
-         builder.ConfigureServices(ConfigureServices);
-
-
-         await builder.Build().RunAsync();
-      }
-
-      private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
+      builder.ConfigureAppConfiguration(appConfiguration =>
       {
-         services.AddSingleton<Common>();
-         services.AddSingleton<SemanticUtility>();
-         services.AddSingleton<Helper>();
-         services.AddSingleton<IFunctionInvocationFilter, SkFunctionInvocationFilter>();
-         services.AddSingleton<DocumentQuestions.Library.DocumentIntelligence>();
-         //services.AddSingleton(sp =>
-         //{
-         //   var config = sp.GetRequiredService<IConfiguration>();
-         //   var endpoint = config.GetValue<Uri>(Constants.DOCUMENTINTELLIGENCE_ENDPOINT) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_ENDPOINT} in configuration");
-         //   var key = config.GetValue<string>(Constants.DOCUMENTINTELLIGENCE_KEY) ?? throw new ArgumentException($"Missing {Constants.DOCUMENTINTELLIGENCE_KEY} in configuration");
-         //   return new DocumentIntelligenceClient(endpoint, new AzureKeyCredential(key));
-         //});
-         services.AddHttpClient();
+         appConfiguration
+            .SetBasePath(basePath)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+            .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT")}.json", optional: true, reloadOnChange: false)
+            .AddJsonFile("local.settings.json", optional: true, reloadOnChange: false)
+            .AddEnvironmentVariables();
+      });
 
-      }
+      builder.ConfigureServices(ConfigureServices);
 
-      public static bool IsDevelopmentEnvironment()
+      await builder.Build().RunAsync().ConfigureAwait(false);
+   }
+
+   private static void ConfigureServices(HostBuilderContext _, IServiceCollection services)
+   {
+      services.AddSingleton<Common>();
+      services.AddSingleton<SemanticUtility>();
+      services.AddSingleton<Helper>();
+      services.AddSingleton<DocumentIntelligence>();
+      services.AddHttpClient();
+   }
+
+   private static string ResolveBasePath()
+   {
+      var scriptRoot = Environment.GetEnvironmentVariable("AzureWebJobsScriptRoot");
+      if (!string.IsNullOrEmpty(scriptRoot))
       {
-         return "Development".Equals(Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT"), StringComparison.OrdinalIgnoreCase);
+         return scriptRoot;
       }
+
+      var home = Environment.GetEnvironmentVariable("HOME");
+      if (!string.IsNullOrEmpty(home))
+      {
+         return Path.Combine(home, "site", "wwwroot");
+      }
+
+      return AppContext.BaseDirectory;
    }
 }

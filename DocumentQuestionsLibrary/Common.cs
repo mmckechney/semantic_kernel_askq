@@ -1,210 +1,189 @@
 ﻿using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using DocumentQuestions.Library.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace DocumentQuestions.Library
+#nullable enable
+
+namespace DocumentQuestions.Library;
+
+public class Common
 {
-   public class Common
+   private static TokenCredential? tokenCredential;
+
+   private readonly ILogger<Common> log;
+   private readonly IConfiguration config;
+
+   public Common(ILogger<Common> log, IConfiguration config)
    {
-      ILogger<Common> log;
-      IConfiguration config;
-      public Common(ILogger<Common> log, IConfiguration config)
+      this.log = log;
+      this.config = config;
+   }
+
+   public static TokenCredential EntraTokenCredential => tokenCredential ??= new ChainedTokenCredential(new ManagedIdentityCredential(), new AzureCliCredential());
+
+   public static string SafeIndexName(string fileName, string customIndexName)
+   {
+      if (!string.IsNullOrWhiteSpace(customIndexName))
       {
-         this.log = log;
-         this.config = config;
+         return ReplaceInvalidCharacters(customIndexName);
       }
 
-      private static TokenCredential _tokenCred = null;
-      public static TokenCredential EntraTokenCredential
+      if (Uri.TryCreate(fileName, UriKind.RelativeOrAbsolute, out var uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
       {
-         get
-         {
-            if(_tokenCred == null)
-            {
-               _tokenCred = new ChainedTokenCredential(new ManagedIdentityCredential(), new AzureCliCredential());
-            }
-            return _tokenCred;
+         fileName = Path.GetFileNameWithoutExtension(uri.AbsolutePath);
+      }
+      else
+      {
+         fileName = Path.GetFileNameWithoutExtension(fileName);
+      }
 
+      return ReplaceInvalidCharacters(fileName.ToLowerInvariant());
+   }
+
+   public static string BaseFileName(string filePathOrUrl)
+   {
+      if (Uri.TryCreate(filePathOrUrl, UriKind.RelativeOrAbsolute, out var uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
+      {
+         return Path.GetFileNameWithoutExtension(uri.AbsolutePath);
+      }
+
+      return Path.GetFileNameWithoutExtension(filePathOrUrl);
+   }
+
+   public static string ReplaceInvalidCharacters(string input)
+   {
+      var sanitized = Path.GetFileNameWithoutExtension(input).ToLowerInvariant();
+      sanitized = Regex.Replace(sanitized, @"[^a-zA-Z0-9-]", "-");
+      sanitized = Regex.Replace(sanitized, @"-+$", string.Empty);
+      return sanitized.Length > 128 ? sanitized[..128] : sanitized;
+   }
+
+   public async Task<string> GetBlobContentAsync(string blobName)
+   {
+      var storageUrl = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
+      var containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
+
+      var blobServiceClient = new BlobServiceClient(new Uri(storageUrl), new DefaultAzureCredential());
+      var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+      var blobs = containerClient.GetBlobs(prefix: blobName);
+      log.LogInformation("Number of blobs {Count}", blobs.Count());
+
+      var content = string.Empty;
+      foreach (var blob in blobs)
+      {
+         var blobClient = containerClient.GetBlobClient(blob.Name);
+         using var stream = await blobClient.OpenReadAsync().ConfigureAwait(false);
+         using var reader = new StreamReader(stream);
+         var processedFileJson = await reader.ReadToEndAsync().ConfigureAwait(false);
+         var chunk = ExtractContent(processedFileJson);
+         if (!string.IsNullOrEmpty(chunk))
+         {
+            content += chunk;
          }
       }
 
-      public static string SafeIndexName(string fileName, string customIndexName)
-      {
-         string safeIndexName = "";
-         if (!string.IsNullOrWhiteSpace(customIndexName))
-         {
-            safeIndexName = Common.ReplaceInvalidCharacters(customIndexName);
-         }
-         else
-         {
+      return content;
+   }
 
-            Uri uri;
-            if (Uri.TryCreate(fileName, UriKind.RelativeOrAbsolute, out uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
-            {
-               // It's a URL
-               fileName =  Path.GetFileNameWithoutExtension(uri.AbsolutePath);
-            }
-            else
-            {
-               // It's a local file path
-               fileName = Path.GetFileNameWithoutExtension(fileName);
-            }
-            safeIndexName = Common.ReplaceInvalidCharacters(fileName.ToLower());
+   public async Task<Dictionary<string, string>> GetBlobContentDictionaryAsync(string blobName)
+   {
+      var storageUrl = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
+      var containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
+
+      var blobServiceClient = new BlobServiceClient(new Uri(storageUrl), new DefaultAzureCredential());
+      var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+      var blobs = containerClient.GetBlobs(prefix: blobName);
+      log.LogInformation("Number of blobs {Count}", blobs.Count());
+
+      var aggregatedContent = string.Empty;
+      var results = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+      foreach (var blob in blobs)
+      {
+         var blobClient = containerClient.GetBlobClient(blob.Name);
+         using var stream = await blobClient.OpenReadAsync().ConfigureAwait(false);
+         using var reader = new StreamReader(stream);
+         var blobContent = await reader.ReadToEndAsync().ConfigureAwait(false);
+         var chunk = ExtractContent(blobContent);
+         if (!string.IsNullOrEmpty(chunk))
+         {
+            aggregatedContent += chunk;
          }
-         return safeIndexName;
+         results[blob.Name] = aggregatedContent;
       }
 
-      public static string BaseFileName(string filePathOrUrl)
+      return results;
+   }
+
+   public string GetFileName(string name)
+   {
+      var nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
+   return nameWithoutExtension.Replace('.', '_') + ".md";
+   }
+
+   public async Task<bool> WriteAnalysisContentToBlob(string name, string content, ILogger logger)
+   {
+      try
       {
-         string fileName;
-         Uri uri;
-         if (Uri.TryCreate(filePathOrUrl, UriKind.RelativeOrAbsolute, out uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
-         {
-            // It's a URL
-            fileName = Path.GetFileNameWithoutExtension(uri.AbsolutePath);
-         }
-         else
-         {
-            // It's a local file path
-            fileName = Path.GetFileNameWithoutExtension(filePathOrUrl);
-         }
-         return fileName;
+         var newName = GetFileName(name);
+         var blobName = Path.GetFileNameWithoutExtension(name) + "/" + newName;
+
+         var storageUrl = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
+         var containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
+
+         var blobServiceClient = new BlobServiceClient(new Uri(storageUrl), new DefaultAzureCredential());
+         var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+         await containerClient.CreateIfNotExistsAsync().ConfigureAwait(false);
+
+         var blobClient = containerClient.GetBlobClient(blobName);
+
+         await using var stream = new MemoryStream();
+         var contentBytes = System.Text.Encoding.UTF8.GetBytes(content);
+         await stream.WriteAsync(contentBytes, 0, contentBytes.Length, cancellationToken: default).ConfigureAwait(false);
+         stream.Seek(0, SeekOrigin.Begin);
+         await blobClient.UploadAsync(stream, overwrite: true).ConfigureAwait(false);
+
+         logger.LogInformation("Markdown file {File} saved to Azure Blob Storage.", newName);
+         return true;
+      }
+      catch (Exception ex)
+      {
+         logger.LogError(ex, "Unable to save file to blob storage.");
+         return false;
+      }
+   }
+
+   private static string ExtractContent(string? json)
+   {
+      if (string.IsNullOrEmpty(json))
+      {
+         return string.Empty;
       }
 
-      public static string ReplaceInvalidCharacters(string input)
+      try
       {
-         input = Path.GetFileNameWithoutExtension(input).ToLower();
-         // Replace any characters that are not letters, digits, or dashes with a dash
-         string result = Regex.Replace(input, @"[^a-zA-Z0-9-]", "-");
-
-         // Remove any trailing dashes
-         result = Regex.Replace(result, @"-+$", "");
-         if (result.Length > 128) result = result.Substring(0, 128);
-         return result;
-      }
-
-      public async Task<string> GetBlobContentAsync(string blobName)
-      {
-         string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
-         string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
-
-
-
-         BlobServiceClient blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
-         BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-
-         var blobs = containerClient.GetBlobs(prefix: blobName);
-         log.LogInformation($"Number of blobs {blobs.Count()}");
-
-         var content = "";
-         foreach (var blob in blobs)
+         using var document = JsonDocument.Parse(json);
+         if (document.RootElement.TryGetProperty("content", out var contentProperty) && contentProperty.ValueKind == JsonValueKind.String)
          {
-            blobName = blob.Name;
-
-            BlobClient blobClient = containerClient.GetBlobClient(blobName);
-
-            // Open the blob and read its contents.  
-            using (Stream stream = await blobClient.OpenReadAsync())
-            {
-               using (StreamReader reader = new StreamReader(stream))
-               {
-                  var processedFile = JsonSerializer.Deserialize<ProcessedFile>(await reader.ReadToEndAsync());
-                  content += processedFile.Content;
-
-
-               }
-            }
-
-         }
-         return content;
-      }
-
-      public async Task<Dictionary<string, string>> GetBlobContentDictionaryAsync(string blobName)
-      {
-         string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
-         string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
-
-
-
-         BlobServiceClient blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
-         BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-
-         var blobs = containerClient.GetBlobs(prefix: blobName);
-         log.LogInformation($"Number of blobs {blobs.Count()}");
-
-         var content = "";
-         Dictionary<string, string> docFile = new();
-
-         foreach (var blob in blobs)
-         {
-
-            blobName = blob.Name;
-
-            BlobClient blobClient = containerClient.GetBlobClient(blobName);
-
-            // Open the blob and read its contents.  
-            using (Stream stream = await blobClient.OpenReadAsync())
-            {
-               using (StreamReader reader = new StreamReader(stream))
-               {
-                  content += await reader.ReadToEndAsync();
-                  docFile.Add(blob.Name, content);
-               }
-            }
-
-         }
-         return docFile;
-      }
-
-
-      public string GetFileName(string name)
-      {
-         string nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
-         string newName = nameWithoutExtension.Replace(".", "_");
-         newName += $".md";
-         return newName;
-      }
-
-      public async Task<bool> WriteAnalysisContentToBlob(string name, string content, ILogger log)
-      {
-         try
-         {
-            string newName = GetFileName(name);
-            string blobName = Path.GetFileNameWithoutExtension(name) + "/" + newName;
-
-            
-            string storageURL = config[Constants.STORAGE_ACCOUNT_BLOB_URL] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_BLOB_URL} in configuration.");
-            string containerName = config[Constants.EXTRACTED_CONTAINER_NAME] ?? throw new ArgumentException($"Missing {Constants.EXTRACTED_CONTAINER_NAME} in configuration.");
-
-            var blobServiceClient = new BlobServiceClient(new Uri(storageURL), new DefaultAzureCredential());
-            BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-            containerClient.CreateIfNotExists();
-
-            BlobClient blobClient = containerClient.GetBlobClient(blobName);
-
-            using (var stream = new MemoryStream())
-            {
-               byte[] contentBytes = System.Text.Encoding.UTF8.GetBytes(content);
-               stream.Write(contentBytes, 0, contentBytes.Length);
-               stream.Seek(0, SeekOrigin.Begin);
-               await blobClient.UploadAsync(stream, overwrite: true);
-
-            }
-
-            log.LogInformation($"Markdown file {newName} saved to Azure Blob Storage.");
-            return true;
-
-         }
-         catch (Exception exe)
-         {
-            log.LogError("Unable to save file: " + exe.Message);
-            return false;
+            return contentProperty.GetString() ?? string.Empty;
          }
       }
+      catch (JsonException)
+      {
+         // Ignore malformed JSON payloads.
+      }
+
+      return string.Empty;
    }
 }

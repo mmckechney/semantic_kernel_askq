@@ -1,9 +1,9 @@
-# Semantic Kernel and Azure OpenAI: Ask Questions on your document
+# Microsoft Agent Framework and Azure OpenAI: Ask Questions on your document
 
 
 ## Overview
 
-This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) and [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/) to ask question specific to that document.
+This solution provides an example of how to process your own documents and then use [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) together with the [Microsoft Agent Framework](https://learn.microsoft.com/azure/ai-services/agents/) to ask questions specific to that document.
 
 **NOTE**: In addition to the Azure Function deployment below, a console app is also provided to demonstrate how to use the OpenAI SDK to ask questions about the document using the same deployed AI services.
 
@@ -17,7 +17,7 @@ This solution provides an example of how to process your own documents and then 
 - Added ability to target additional prebuilt models on the console app with the `process --file "<file name> --model <model name> command` To see the list of available models run `process -h`
   - To add addition prebuilt models of interest, add the model name to the list found at the top of [DocumentQuestionsLibrary/DocumentIntelligence.cs](DocumentQuestionsLibrary/DocumentIntelligence.cs). The list of models is maintained [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/model-overview?view=doc-intel-4.0.0)
 - Added new command `clear-index` which will delete process document indexes by name or all of the indexes using the `all` keyword
-- Added sample telemetry with [DocumentQuestionsLibrary/SkFunctionInvocationFilter.cs](DocumentQuestionsLibrary/SkFunctionInvocationFilter.cs) demonstrating how to intercept Semantic Kernel function invocation before and after execution of the function
+- Switched orchestration to the Microsoft Agent Framework preview packages and the latest Azure SDK clients
 - Added OpenTelemetry configuration to the Console app and the Function if the `APPLICATIONINSIGHTS_CONNECTION_STRING` app setting is provided
 
 
@@ -29,7 +29,7 @@ This solution provides an example of how to process your own documents and then 
 
      1. `HttpTriggerUploadFile` - upload documents to an Azure Storage account via a REST Api
      2. `BlobTriggerProcessFile` - detects the uploaded document and processes it through [Azure Cognitive Services Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/overview?view=doc-intel-3.1.0) into one or more Markdown files (depending on the size of the document)
-     3. `HttpTriggerSemanticKernelAskQuestion` - REST Api to ask questions about the document using Semantic Kernel SDK
+   3. `HttpTriggerAgentAskQuestion` - REST API to ask questions about the document using the Microsoft Agent Framework
 
 - A console app to easily run and test locally
 
@@ -85,7 +85,7 @@ If successful, this process will create:
 For this example, download and use [US Declaration of Independence as a PDF file](https://uscode.house.gov/download/annualhistoricalarchives/pdf/OrganicLaws2006/decind.pdf)
 2. Once the file i uploaded, the `BlobTriggerProcessFile` will automatically trigger, process it with Document Intelligence and create a new folder called `decind` in the `extracted` blob container and save 3 Markdown files.
 
-3. Ask questions using the `HttpTriggerSemanticKernelAskQuestion` function - this uses semantic config to only load max of 2 pages to reduce tokens provided to Azure OpenAI.
+3. Ask questions using the `HttpTriggerAgentAskQuestion` function - this uses the agent configuration to only load max of 2 pages to reduce tokens provided to Azure OpenAI.
 
    Question:
 

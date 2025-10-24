@@ -1,19 +1,22 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿#nullable enable
+
+using Azure;
+using Azure.AI.DocumentIntelligence;
+using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.Exporter;
+using DocumentQuestions.Library;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
-using DocumentQuestions.Library;
-using Azure.AI.DocumentIntelligence;
-using Azure;
-using Azure.Identity;
-using Microsoft.SemanticKernel;
-using Azure.Monitor.OpenTelemetry.Exporter;
-using OpenTelemetry.Resources;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Microsoft.Extensions.Options;
+using System;
+using System.IO;
+using System.Linq;
 
 namespace DocumentQuestions.Console
 {
@@ -34,20 +37,22 @@ namespace DocumentQuestions.Console
          if (set)
          {
             System.Console.WriteLine($"Log level set to '{level.ToString()}'");
-            args = new string[] { "--help" };
+            args = new[] { "--help" };
          }
 
          // Build the configuration
+         var basePath = AppContext.BaseDirectory;
+
          var config = new ConfigurationBuilder()
-             .SetBasePath(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location))
-             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-             .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-             .AddEnvironmentVariables()
-             .Build();
+            .SetBasePath(basePath)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .Build();
 
 
-         var connectionString = config.GetValue<string>(Constants.APPLICATIONINSIGHTS_CONNECTION_STRING);//?? throw new ArgumentException($"Missing {Constants.APPINSIGHTS_CONNECTION_STRING} in configuration");
-         ResourceBuilder resourceBuilder = null;
+         var connectionString = config.GetValue<string?>(Constants.APPLICATIONINSIGHTS_CONNECTION_STRING);//?? throw new ArgumentException($"Missing {Constants.APPINSIGHTS_CONNECTION_STRING} in configuration");
+         ResourceBuilder? resourceBuilder = null;
          if (!string.IsNullOrWhiteSpace(connectionString))
          {
             resourceBuilder = ResourceBuilder
@@ -55,17 +60,16 @@ namespace DocumentQuestions.Console
                 .AddService("DocumentQuestions.Console");
 
             // Enable model diagnostics with sensitive data.
-            AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
-
             using var traceProvider = Sdk.CreateTracerProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddSource("Microsoft.SemanticKernel*")
+            .AddSource("Microsoft.Agents.AI*")
+            .AddSource("Microsoft.Extensions.AI*")
                 .AddAzureMonitorTraceExporter(options => options.ConnectionString = connectionString)
                 .Build();
 
             using var meterProvider = Sdk.CreateMeterProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddMeter("Microsoft.SemanticKernel*")
+            .AddMeter("Microsoft.Agents.AI*", "Microsoft.Extensions.AI*")
                 .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
                 .Build();
          }
@@ -77,7 +81,6 @@ namespace DocumentQuestions.Console
                services.AddSingleton<SemanticUtility>();
                services.AddSingleton<DocumentIntelligence>();
                services.AddSingleton<AiSearch>();
-               services.AddSingleton<IFunctionInvocationFilter, SkFunctionInvocationFilter>();
                services.AddSingleton(sp =>
                {
                   var config = sp.GetRequiredService<IConfiguration>();
@@ -95,12 +98,16 @@ namespace DocumentQuestions.Console
                 logging.SetMinimumLevel(level);
                 logging.AddFilter("System", LogLevel.Warning);
                 logging.AddFilter("Microsoft", LogLevel.Warning);
-                logging.AddFilter("Microsoft.SemanticKernel", LogLevel.Warning);
+                logging.AddFilter("Microsoft.Agents.AI", LogLevel.Warning);
+                logging.AddFilter("Microsoft.Extensions.AI", LogLevel.Warning);
                 if (!string.IsNullOrWhiteSpace(connectionString))
                 {
                    logging.AddOpenTelemetry(options =>
                   {
-                     options.SetResourceBuilder(resourceBuilder);
+                     if (resourceBuilder is not null)
+                     {
+                        options.SetResourceBuilder(resourceBuilder);
+                     }
                      options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
                      // Format log messages. This is default to false.
                      options.IncludeFormattedMessage = true;
@@ -118,7 +125,7 @@ namespace DocumentQuestions.Console
              
              .ConfigureAppConfiguration((hostContext, appConfiguration) =>
              {
-                appConfiguration.SetBasePath(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
+                appConfiguration.SetBasePath(AppContext.BaseDirectory);
                 appConfiguration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
                 appConfiguration.AddJsonFile("local.settings.json", optional: false, reloadOnChange: true);
                 appConfiguration.AddEnvironmentVariables();

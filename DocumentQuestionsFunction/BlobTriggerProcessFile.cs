@@ -1,69 +1,58 @@
-using Azure;
-using Azure.AI.DocumentIntelligence;
-using Azure.Storage.Blobs;
+#nullable enable
+
 using DocumentQuestions.Library;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
-using DocumentQuestions.Library.Models;
-using Azure.Identity;
-namespace DocumentQuestions.Function
+
+namespace DocumentQuestions.Function;
+
+public sealed class BlobTriggerProcessFile
 {
-   public class BlobTriggerProcessFile
+   private readonly SemanticUtility semanticUtility;
+   private readonly ILogger<BlobTriggerProcessFile> log;
+   private readonly IConfiguration config;
+   private readonly DocumentIntelligence documentIntelligence;
+
+   public BlobTriggerProcessFile(ILogger<BlobTriggerProcessFile> log, IConfiguration config, SemanticUtility semanticUtility, DocumentIntelligence documentIntelligence)
    {
-      private SemanticUtility semanticMemory;
-      private ILoggerFactory logFactory;
-      private ILogger<BlobTriggerProcessFile> log;
-      private IConfiguration config;
-      //private DocumentIntelligenceClient docIntelClient;
-      private Common common;
-      private DocumentIntelligence docIntel;
-      public BlobTriggerProcessFile(ILoggerFactory logFactory, IConfiguration config, SemanticUtility semanticMemory, DocumentIntelligence docIntel, Common common)
+      this.log = log ?? throw new ArgumentNullException(nameof(log));
+      this.config = config ?? throw new ArgumentNullException(nameof(config));
+      this.semanticUtility = semanticUtility ?? throw new ArgumentNullException(nameof(semanticUtility));
+      this.documentIntelligence = documentIntelligence ?? throw new ArgumentNullException(nameof(documentIntelligence));
+   }
+
+   [Function("BlobTriggerProcessFile")]
+   public async Task RunAsync(
+      [BlobTrigger("raw/{name}", Connection = "STORAGE_ACCOUNT_BLOB_URL")] Stream blobStream,
+      string name,
+      CancellationToken cancellationToken)
+   {
+      ArgumentNullException.ThrowIfNull(blobStream);
+
+      try
       {
-         this.semanticMemory = semanticMemory;
-         this.logFactory = logFactory;
-         log = logFactory.CreateLogger<BlobTriggerProcessFile>();
-         this.config = config;
-         this.docIntel = docIntel;
-         this.common = common;
-      }
+         log.LogInformation("Processing blob {BlobName}", name);
 
-      [Function("BlobTriggerProcessFile")]
-      public async Task RunAsync([BlobTrigger("raw/{name}", Connection = "STORAGE_ACCOUNT_BLOB_URL")] Stream myBlob, string name)
+         var storageAccountName = config[Constants.STORAGE_ACCOUNT_NAME] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_NAME} in configuration.");
+         var collectionName = Path.GetFileNameWithoutExtension(name);
+
+         semanticUtility.ReloadAgentResources();
+
+         var fileUri = new Uri($"https://{storageAccountName}.blob.core.windows.net/raw/{name}");
+
+         log.LogInformation("Submitting document {DocumentUri} for analysis.", fileUri);
+         await documentIntelligence.ProcessDocument(fileUri, indexName: collectionName, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+         log.LogInformation("Document Intelligence processing completed for {BlobName}.", name);
+      }
+      catch (Exception ex)
       {
-         try
-         {
-            log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name}");
-            string storageAccountName = config[Constants.STORAGE_ACCOUNT_NAME] ?? throw new ArgumentException($"Missing {Constants.STORAGE_ACCOUNT_NAME} in configuration.");
-            string memoryCollectionName = Path.GetFileNameWithoutExtension(name);
-
-
-            semanticMemory.InitMemoryAndKernel();
-
-            string imgUrl = $"https://{storageAccountName}.blob.core.windows.net/raw/{name}";
-
-            log.LogInformation(imgUrl);
-
-            Uri fileUri = new Uri(imgUrl);
-
-            log.LogInformation("About to get data from document intelligence module.");
-            await docIntel.ProcessDocument(fileUri);
-           log.LogInformation($"Document Intelligence processing completed for {name}");
-         }
-         catch (Exception ex)
-         {
-            log.LogError(ex.Message);
-         }
-
-
-
+         log.LogError(ex, "Unhandled exception while processing blob {BlobName}.", name);
       }
-     
-
    }
 }

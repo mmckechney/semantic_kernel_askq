@@ -1,27 +1,34 @@
-﻿using DocumentQuestions.Library;
+﻿#nullable enable
+
+using DocumentQuestions.Library;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
-using System.Reflection;
+using System.IO;
+using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using syS = System;
 
 namespace DocumentQuestions.Console
 {
    internal class Worker : BackgroundService
    {
-      private static ILogger<Worker> log;
-      private static ILoggerFactory logFactory;
-      private static IConfiguration config;
+      private static ILogger<Worker> log = null!;
+      private static ILoggerFactory logFactory = null!;
+      private static IConfiguration config = null!;
       private static StartArgs? startArgs;
-      private static SemanticUtility semanticUtility;
-      private static Common common;
-      private static Parser rootParser;
-      private static DocumentIntelligence documentIntelligence;
+      private static SemanticUtility semanticUtility = null!;
+      private static Common common = null!;
+      private static Parser? rootParser;
+      private static DocumentIntelligence documentIntelligence = null!;
       private static string activeDocument = string.Empty;
-      private static AiSearch aiSearch;
+      private static AiSearch aiSearch = null!;
       public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, SemanticUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
       {
          log = logger;
@@ -70,38 +77,57 @@ namespace DocumentQuestions.Console
       {
          if (string.IsNullOrWhiteSpace(chatModel) && string.IsNullOrWhiteSpace(chatDeployment) && string.IsNullOrWhiteSpace(embedModel) && string.IsNullOrWhiteSpace(embedDeployment))
          {
-            await rootParser.InvokeAsync("ai set -h");
+            if (rootParser is not null)
+            {
+               await rootParser.InvokeAsync("ai set -h").ConfigureAwait(false);
+            }
             return;
          }
          bool changed = false;
          if (!string.IsNullOrWhiteSpace(chatModel))
          {
             config[Constants.OPENAI_CHAT_MODEL_NAME] = chatModel;
-            log.LogInformation(new() { { "Set chat model to", ConsoleColor.DarkYellow }, { chatModel, ConsoleColor.Yellow } });
+            log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+            {
+               { "Set chat model to", ConsoleColor.DarkYellow },
+               { chatModel, ConsoleColor.Yellow },
+            });
             changed = true;
          }
          if (!string.IsNullOrWhiteSpace(chatDeployment))
          {
             config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] = chatDeployment;
-            log.LogInformation(new() { { "Set chat deployment to", ConsoleColor.DarkYellow }, { chatDeployment, ConsoleColor.Yellow } });
+            log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+            {
+               { "Set chat deployment to", ConsoleColor.DarkYellow },
+               { chatDeployment, ConsoleColor.Yellow },
+            });
             changed = true;
          }
          if (!string.IsNullOrWhiteSpace(embedModel))
          {
             config[Constants.OPENAI_EMBEDDING_MODEL_NAME] = embedModel;
-            log.LogInformation(new() { { "Set embedding model to", ConsoleColor.DarkYellow }, { embedModel, ConsoleColor.Yellow } });
+            log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+            {
+               { "Set embedding model to", ConsoleColor.DarkYellow },
+               { embedModel, ConsoleColor.Yellow },
+            });
             changed = true;
          }
          if (!string.IsNullOrWhiteSpace(embedDeployment))
          {
             config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] = embedDeployment;
-            log.LogInformation(new() { { "Set embedding deployment to", ConsoleColor.DarkYellow }, { embedDeployment, ConsoleColor.Yellow } });
+            log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+            {
+               { "Set embedding deployment to", ConsoleColor.DarkYellow },
+               { embedDeployment, ConsoleColor.Yellow },
+            });
             changed = true;
          }
 
          if (changed)
          {
-            semanticUtility.InitMemoryAndKernel();
+            semanticUtility.ReloadAgentResources();
             ListAiSettings();
          }
       }
@@ -135,10 +161,26 @@ namespace DocumentQuestions.Console
          int pad = 21;
          log.LogInformation("-------------------------------------");
          log.LogInformation("Azure OpenAI settings", ConsoleColor.Gray);
-         log.LogInformation(new() { { "Chat Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_MODEL_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Chat Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_MODEL_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME], ConsoleColor.Blue } });
+         log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+         {
+            { "Chat Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue },
+            { SafeConfigValue(Constants.OPENAI_CHAT_MODEL_NAME), ConsoleColor.Blue },
+         });
+         log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+         {
+            { "Chat Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue },
+            { SafeConfigValue(Constants.OPENAI_CHAT_DEPLOYMENT_NAME), ConsoleColor.Blue },
+         });
+         log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+         {
+            { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue },
+            { SafeConfigValue(Constants.OPENAI_EMBEDDING_MODEL_NAME), ConsoleColor.Blue },
+         });
+         log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+         {
+            { "Embedding Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue },
+            { SafeConfigValue(Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME), ConsoleColor.Blue },
+         });
          log.LogInformation("-------------------------------------");
 
 
@@ -176,7 +218,7 @@ namespace DocumentQuestions.Console
             return;
          }
 
-         if (Path.GetExtension(file).ToLower() == ".xml")
+         if (Path.GetExtension(file).ToLowerInvariant() == ".xml")
          {
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -194,7 +236,7 @@ namespace DocumentQuestions.Console
 
             string indexName = Common.SafeIndexName(file, index);
             string fileName = Common.BaseFileName(file);
-            List<string> contentlst = new() {  name, sb.ToString() };
+            List<string> contentlst = new() { name, sb.ToString() };
             await semanticUtility.StoreMemoryAsync(indexName, fileName, contentlst);
             await semanticUtility.StoreMemoryAsync("general", fileName, contentlst);
 
@@ -214,11 +256,21 @@ namespace DocumentQuestions.Console
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
-         Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
          rootParser = CommandBuilder.BuildCommandLine();
-         string[] args = startArgs.Args;
-         if (args.Length == 0) args = new string[] { "-h" };
-         int val = await rootParser.InvokeAsync(args);
+         var args = startArgs?.Args ?? Array.Empty<string>();
+         if (args.Length == 0)
+         {
+            args = new[] { "-h" };
+         }
+
+         var parser = rootParser;
+         if (parser is null)
+         {
+            throw new InvalidOperationException("Command parser failed to initialize.");
+         }
+
+         int val = await parser.InvokeAsync(args).ConfigureAwait(false);
          bool firstPass = true;
          int fileCount = 0;
          StringBuilder sb;
@@ -228,14 +280,18 @@ namespace DocumentQuestions.Console
             syS.Console.WriteLine();
             if (firstPass || string.IsNullOrWhiteSpace(activeDocument))
             {
-               fileCount = await rootParser.InvokeAsync("list");
+               fileCount = await parser.InvokeAsync("list").ConfigureAwait(false);
             }
 
             if (fileCount > 0)
             {
                if (!string.IsNullOrWhiteSpace(activeDocument))
                {
-                  log.LogInformation(new() { { "Active Document: ", ConsoleColor.DarkGreen }, { activeDocument, ConsoleColor.Blue } });
+                  log.LogInformation(new Dictionary<string, syS.ConsoleColor>
+                  {
+                     { "Active Document: ", ConsoleColor.DarkGreen },
+                     { activeDocument, ConsoleColor.Blue },
+                  });
                   //log.LogInformation("use '--doc' flag to change the active document.", ConsoleColor.Yellow);
                }
                else
@@ -257,9 +313,15 @@ namespace DocumentQuestions.Console
             {
                return;
             }
-            val = await rootParser.InvokeAsync(line);
+            val = await parser.InvokeAsync(line).ConfigureAwait(false);
             firstPass = false;
          }
+      }
+
+      private static string SafeConfigValue(string key)
+      {
+         var value = config[key];
+         return string.IsNullOrWhiteSpace(value) ? "<not set>" : value;
       }
    }
 }
