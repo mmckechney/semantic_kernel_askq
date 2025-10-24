@@ -7,8 +7,8 @@ services:
     project: ./DocumentQuestionsFunction/
     language: csharp
     host: function
-       
-    
+
+
 infra:
   bicep: ./infra/main.bicep
   parameters:

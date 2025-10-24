@@ -13,12 +13,12 @@ namespace DocumentQuestions.Function;
 
 public sealed class BlobTriggerProcessFile
 {
-   private readonly SemanticUtility semanticUtility;
+   private readonly AgentUtility semanticUtility;
    private readonly ILogger<BlobTriggerProcessFile> log;
    private readonly IConfiguration config;
    private readonly DocumentIntelligence documentIntelligence;
 
-   public BlobTriggerProcessFile(ILogger<BlobTriggerProcessFile> log, IConfiguration config, SemanticUtility semanticUtility, DocumentIntelligence documentIntelligence)
+   public BlobTriggerProcessFile(ILogger<BlobTriggerProcessFile> log, IConfiguration config, AgentUtility semanticUtility, DocumentIntelligence documentIntelligence)
    {
       this.log = log ?? throw new ArgumentNullException(nameof(log));
       this.config = config ?? throw new ArgumentNullException(nameof(config));

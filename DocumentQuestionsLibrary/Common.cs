@@ -3,11 +3,6 @@ using Azure.Identity;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -129,7 +124,7 @@ public class Common
    public string GetFileName(string name)
    {
       var nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
-   return nameWithoutExtension.Replace('.', '_') + ".md";
+      return nameWithoutExtension.Replace('.', '_') + ".md";
    }
 
    public async Task<bool> WriteAnalysisContentToBlob(string name, string content, ILogger logger)

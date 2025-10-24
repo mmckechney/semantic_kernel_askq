@@ -1,12 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Text.RegularExpressions;
-using Azure;
+﻿using Azure;
 using Azure.AI.OpenAI;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
@@ -14,20 +6,24 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using OpenAI.Embeddings;
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace DocumentQuestions.Library;
 
-public partial class SemanticUtility
+public partial class AgentUtility
 {
    private const string VectorFieldName = "contentVector";
    private const string ContentFieldName = "content";
    private const string FileNameFieldName = "fileName";
    private const string IdFieldName = "id";
 
-   private readonly ILogger<SemanticUtility> log;
+   private readonly ILogger<AgentUtility> log;
    private readonly IConfiguration config;
 
    private readonly object initLock = new();
@@ -36,6 +32,7 @@ public partial class SemanticUtility
    private AzureOpenAIClient? openAiClient;
    private IChatClient? chatClient;
    private ChatClientAgent? agent;
+   private AiSearch aiSearchAdmin;
    private IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator;
    private Uri? searchEndpoint;
    private string? searchKey;
@@ -43,11 +40,12 @@ public partial class SemanticUtility
 
    private readonly ConcurrentDictionary<string, PromptDefinition> prompts = new(StringComparer.OrdinalIgnoreCase);
 
-   public SemanticUtility(ILoggerFactory logFactory, IConfiguration config, Common common)
+   public AgentUtility(ILoggerFactory logFactory, IConfiguration config, Common common, AiSearch aiSearchAdmin)
    {
-      log = logFactory.CreateLogger<SemanticUtility>();
+      log = logFactory.CreateLogger<AgentUtility>();
       this.config = config;
       _ = common ?? throw new ArgumentNullException(nameof(common));
+      this.aiSearchAdmin = aiSearchAdmin ?? throw new ArgumentNullException(nameof(common));
       LoadPrompts();
       EnsureInitialized();
    }
@@ -99,6 +97,7 @@ public partial class SemanticUtility
       }
 
       collectionName = Common.ReplaceInvalidCharacters(collectionName);
+      await aiSearchAdmin.AddIndex(collectionName);
       log.LogInformation("Storing memory to AI Search collection '{Collection}'...", collectionName);
 
       var credential = new AzureKeyCredential(searchKey!);
@@ -136,7 +135,7 @@ public partial class SemanticUtility
          return;
       }
 
-   await client.MergeOrUploadDocumentsAsync(documents, cancellationToken: cancellationToken).ConfigureAwait(false);
+      await client.MergeOrUploadDocumentsAsync(documents, cancellationToken: cancellationToken).ConfigureAwait(false);
       log.LogInformation("{Count} entries saved to {Collection}.", documents.Count, collectionName);
    }
 
@@ -168,10 +167,10 @@ public partial class SemanticUtility
       options.Select.Add(FileNameFieldName);
       options.IncludeTotalCount = true;
 
-   var response = await client.SearchAsync<SearchDocument>(null, options, cancellationToken).ConfigureAwait(false);
+      var response = await client.SearchAsync<SearchDocument>(null, options, cancellationToken).ConfigureAwait(false);
 
-   var results = new List<SemanticMemoryResult>();
-   await foreach (var result in response.Value.GetResultsAsync().WithCancellation(cancellationToken).ConfigureAwait(false))
+      var results = new List<SemanticMemoryResult>();
+      await foreach (var result in response.Value.GetResultsAsync().WithCancellation(cancellationToken).ConfigureAwait(false))
       {
          var content = result.Document.TryGetValue(ContentFieldName, out var textObj) ? textObj as string : null;
          var fileName = result.Document.TryGetValue(FileNameFieldName, out var fileObj) ? fileObj as string : null;
@@ -273,7 +272,8 @@ public partial class SemanticUtility
 
    private PromptDefinition GetPrompt(string promptKey)
    {
-      if (!prompts.TryGetValue(promptKey, out var prompt))
+      var prefixed = $"Prompts_{promptKey}";
+      if (!prompts.TryGetValue(prefixed, out var prompt))
       {
          throw new InvalidOperationException($"Prompt '{promptKey}' was not found.");
       }

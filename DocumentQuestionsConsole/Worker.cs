@@ -4,15 +4,9 @@ using DocumentQuestions.Library;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using syS = System;
 
 namespace DocumentQuestions.Console
@@ -23,13 +17,13 @@ namespace DocumentQuestions.Console
       private static ILoggerFactory logFactory = null!;
       private static IConfiguration config = null!;
       private static StartArgs? startArgs;
-      private static SemanticUtility semanticUtility = null!;
+      private static AgentUtility semanticUtility = null!;
       private static Common common = null!;
       private static Parser? rootParser;
       private static DocumentIntelligence documentIntelligence = null!;
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch = null!;
-      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, SemanticUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
+      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
       {
          log = logger;
          logFactory = loggerFactory;
@@ -231,14 +225,14 @@ namespace DocumentQuestions.Console
             }
             sw.Stop();
             syS.Console.WriteLine();
-            
+
             log.LogInformation($"Extraction time: {Math.Ceiling(sw.Elapsed.TotalSeconds)} seconds", ConsoleColor.Cyan);
 
             string indexName = Common.SafeIndexName(file, index);
             string fileName = Common.BaseFileName(file);
             List<string> contentlst = new() { name, sb.ToString() };
             await semanticUtility.StoreMemoryAsync(indexName, fileName, contentlst);
-            await semanticUtility.StoreMemoryAsync("general", fileName, contentlst);
+            // await semanticUtility.StoreMemoryAsync("general", fileName, contentlst);
 
             return;
          }

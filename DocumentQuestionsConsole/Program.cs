@@ -2,7 +2,6 @@
 
 using Azure;
 using Azure.AI.DocumentIntelligence;
-using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using DocumentQuestions.Library;
 using Microsoft.Extensions.Configuration;
@@ -14,9 +13,6 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using System;
-using System.IO;
-using System.Linq;
 
 namespace DocumentQuestions.Console
 {
@@ -78,7 +74,7 @@ namespace DocumentQuestions.Console
             .ConfigureServices((hostContext, services) =>
             {
                services.AddSingleton<StartArgs>(new StartArgs(args));
-               services.AddSingleton<SemanticUtility>();
+               services.AddSingleton<AgentUtility>();
                services.AddSingleton<DocumentIntelligence>();
                services.AddSingleton<AiSearch>();
                services.AddSingleton(sp =>
@@ -122,7 +118,7 @@ namespace DocumentQuestions.Console
 
                 });
              })
-             
+
              .ConfigureAppConfiguration((hostContext, appConfiguration) =>
              {
                 appConfiguration.SetBasePath(AppContext.BaseDirectory);

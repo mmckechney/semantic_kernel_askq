@@ -3,6 +3,12 @@ param storageAccountName string
 param keyVaultName string
 param rawBlobContainerName string
 param extractedBlobContainerName string
+param deploymentContainerName string
+param storageBlobEndpoint string
+@allowed([512, 2048, 4096])
+param instanceMemoryMB int = 2048
+@allowed( [40, 1000])
+param maxInstanceCount int = 40
 param openAIChatModel string
 param openAIChatDeploymentName string 
 param openAIEmbeddingModel string
@@ -13,42 +19,32 @@ param aiSearchEndpoint string
 
 var constants = loadJsonContent('./constants.json')
 var kvKeys = loadJsonContent('./kvKeys.json')
+var deploymentContainerUrl = '${storageBlobEndpoint}${deploymentContainerName}'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: storageAccountName
 }
 
-var storageAccountConnection = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
 
-resource appServicePlan 'Microsoft.Web/serverfarms@2021-01-15' = {
+
+resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: '${functionAppName}-asp'
   location: location
-  kind: 'app'
+  kind: 'functionapp'
   sku:{
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
-}
-
-
-resource functionAppConfig 'Microsoft.Web/sites/config@2022-09-01' = {
-  name : 'web'
-  kind: 'string'
-  parent: functionApp
   properties: {
-    cors: {
-      allowedOrigins: [
-        'https://portal.azure.com'
-      ]
-      supportCredentials: true
-    }
+    reserved: true
   }
-  
 }
-resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
+
+
+resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   name: functionAppName
   location: location
-  kind: 'functionapp'
+  kind: 'functionapp,linux'
   identity: {
     type: 'SystemAssigned'
   }
@@ -56,9 +52,10 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
     'azd-service-name': 'documentquestionsfunction'
   }
   properties: {
+    httpsOnly: true
     serverFarmId: appServicePlan.id
     siteConfig: {
-      netFrameworkVersion: 'v8.0'
+      //linuxFxVersion: 'DOTNETCORE|8.0'
       appSettings: [
         {
           name: 'AzureWebJobsStorage__accountName'
@@ -69,12 +66,16 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           value: 'managedidentity'
         }
         {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: storageAccountConnection
+          name: 'AzureWebJobsStorage__blobServiceUri'
+          value: storageAccount.properties.primaryEndpoints.blob
         }
         {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: '${toLower(functionAppName)}fileshare'
+          name: 'AzureWebJobsStorage__queueServiceUri'
+          value: storageAccount.properties.primaryEndpoints.queue
+        }
+        {
+          name: 'AzureWebJobsStorage__tableServiceUri'
+          value: storageAccount.properties.primaryEndpoints.table
         }
         {
           name:  constants.DOCUMENTINTELLIGENCE_KEY
@@ -128,6 +129,14 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           name: constants.STORAGE_ACCOUNT_NAME
           value: storageAccountName
         }
+        // {
+        //   name: 'WEBSITE_RUN_FROM_PACKAGE'
+        //   value: deploymentContainerUrl
+        // }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE_BLOB_MI_RESOURCE_ID'
+          value: 'SystemAssigned'
+        }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
@@ -136,10 +145,10 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           name: 'FUNCTIONS_EXTENSION_VERSION'
           value: '~4'
         }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'dotnet-isolated'
-        }
+        // {
+        //   name: 'FUNCTIONS_WORKER_RUNTIME'
+        //   value: 'dotnet-isolated'
+        // }
         {
           name: constants.AISEARCH_ENDPOINT
           value: aiSearchEndpoint
@@ -151,9 +160,41 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
        
       ]
     }
+      functionAppConfig: {
+        deployment: {
+          storage: {
+            type: 'blobContainer'
+            value: deploymentContainerUrl
+            authentication: {
+              type: 'SystemAssignedIdentity'
+            }
+          }
+        }
+        runtime: {
+          name: 'dotnet-isolated'
+          version: '8.0'
+        }
+        scaleAndConcurrency: {
+          instanceMemoryMB: instanceMemoryMB
+          maximumInstanceCount: maxInstanceCount
+        }
+      }
   }
 }
-resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
+  resource functionAppConfig 'Microsoft.Web/sites/config@2024-04-01' = {
+    name : 'web'
+    kind: 'string'
+    parent: functionApp
+    properties: {
+      cors: {
+        allowedOrigins: [
+          'https://portal.azure.com'
+        ]
+        supportCredentials: true
+      }
+    }
+  }
+  resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
   name: '${functionAppName}-insights'
   location: location
   kind: 'web'

@@ -18,6 +18,8 @@ param openAIServiceName string
 
 
 var safeStorageAccountName = toLower(replace(storageAccountName, '-', ''))
+var normalizedFunctionName = toLower(replace(functionAppName, '-', ''))
+var packageContainerName = take('${normalizedFunctionName}pkg', 63)
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
     name: resourceGroupName
     location: location
@@ -67,6 +69,7 @@ module storageResources 'storage.bicep' = {
     params: {
         storageAccountName: safeStorageAccountName
         location: location
+        deploymentContainerName: packageContainerName
     }
     dependsOn: [
         rg
@@ -87,6 +90,8 @@ module functionResources 'function.bicep' = {
         storageAccountName: safeStorageAccountName
         extractedBlobContainerName: storageResources.outputs.extractedContainerName
         rawBlobContainerName: storageResources.outputs.rawContainerName
+        deploymentContainerName: storageResources.outputs.deploymentContainerName
+        storageBlobEndpoint: storageResources.outputs.blobEndpoint
         keyVaultName: keyVaultName
         aiSearchEndpoint : aiSearch.outputs.aiSearchEndpoint
         docIntelligenceEndpoint : docIntelligence.outputs.docIntelEndpoint

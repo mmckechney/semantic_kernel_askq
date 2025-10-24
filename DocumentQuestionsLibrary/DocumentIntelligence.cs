@@ -4,13 +4,7 @@ using Azure;
 using Azure.AI.DocumentIntelligence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace DocumentQuestions.Library;
 
@@ -31,10 +25,10 @@ public class DocumentIntelligence
 
    private readonly DocumentIntelligenceClient docIntelClient;
    private readonly ILogger<DocumentIntelligence> log;
-   private readonly SemanticUtility semanticUtility;
+   private readonly AgentUtility semanticUtility;
    private readonly Common common;
 
-   public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, Common common)
+   public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, AgentUtility semanticUtility, Common common)
    {
       this.log = log ?? throw new ArgumentNullException(nameof(log));
       this.semanticUtility = semanticUtility ?? throw new ArgumentNullException(nameof(semanticUtility));
@@ -95,7 +89,7 @@ public class DocumentIntelligence
 
       indexName = Common.SafeIndexName(filePathOrUrl, indexName);
       var content = result.Content ?? string.Empty;
-      var contentLines = content.Split(Environment.NewLine, StringSplitOptions.None).ToList();
+      var contentLines = content.Split("\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
       log.LogInformation("Writing document markdown to blob storage...");
       await common.WriteAnalysisContentToBlob(indexName, content, log).ConfigureAwait(false);
@@ -106,8 +100,8 @@ public class DocumentIntelligence
       log.LogInformation("Saving Document Intelligence results to Azure AI Search indexes...");
       var fileName = Common.BaseFileName(filePathOrUrl);
       await Task.WhenAll(
-         semanticUtility.StoreMemoryAsync(indexName, fileName, chunked, cancellationToken),
-         semanticUtility.StoreMemoryAsync("general", fileName, chunked, cancellationToken)
+         semanticUtility.StoreMemoryAsync(indexName, fileName, chunked, cancellationToken)
+      // semanticUtility.StoreMemoryAsync("general", fileName, chunked, cancellationToken)
       ).ConfigureAwait(false);
 
       log.LogInformation("Document {Document} processed and indexed.", fileName);

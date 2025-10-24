@@ -4,6 +4,7 @@
 		<AzureFunctionsVersion>v4</AzureFunctionsVersion>
 		<OutputType>Exe</OutputType>
 		<PublishReadyToRun>true</PublishReadyToRun>
+		<RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
 		<RootNamespace>DocumentQuestions.Function</RootNamespace>
 	  <UserSecretsId>95c45569-a700-4ac8-9860-79dc624e4a44</UserSecretsId>
   </PropertyGroup>

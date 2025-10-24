@@ -103,7 +103,7 @@ internal static class Startup
    private static void ConfigureServices(HostBuilderContext _, IServiceCollection services)
    {
       services.AddSingleton<Common>();
-      services.AddSingleton<SemanticUtility>();
+      services.AddSingleton<AgentUtility>();
       services.AddSingleton<Helper>();
       services.AddSingleton<DocumentIntelligence>();
       services.AddHttpClient();

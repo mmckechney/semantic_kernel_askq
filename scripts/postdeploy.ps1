@@ -5,11 +5,11 @@ $functionAppName = $(azd env get-values --output json | ConvertFrom-Json).AZURE_
 
 # Publish the function app to Azure (need this because for some reason the azd command doesn't work)
 # This is a workaround for the azd command not working as expected
-Write-Host "Publishing function app to $functionAppName"
-Push-Location -Path ./DocumentQuestionsFunction
-func azure functionapp publish $functionAppName
-Pop-Location
-Write-Host "Function app deployment completed"
+# Write-Host "Publishing function app to $functionAppName"
+# Push-Location -Path ./DocumentQuestionsFunction
+# func azure functionapp publish $functionAppName
+# Pop-Location
+# Write-Host "Function app deployment completed"
 
 
 # Create local settings file for Console app with the environment values

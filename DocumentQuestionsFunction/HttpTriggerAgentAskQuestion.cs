@@ -14,12 +14,12 @@ namespace DocumentQuestions.Function
 {
    public class HttpTriggerAgentAskQuestion
    {
-      private readonly SemanticUtility semanticUtility;
+      private readonly AgentUtility semanticUtility;
       private readonly ILogger<HttpTriggerAgentAskQuestion> log;
       private readonly IConfiguration config;
       private readonly Helper common;
 
-      public HttpTriggerAgentAskQuestion(ILogger<HttpTriggerAgentAskQuestion> log, IConfiguration config, Helper common, SemanticUtility semanticMemory)
+      public HttpTriggerAgentAskQuestion(ILogger<HttpTriggerAgentAskQuestion> log, IConfiguration config, Helper common, AgentUtility semanticMemory)
       {
          this.log = log;
          this.config = config;
