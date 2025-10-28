@@ -43,7 +43,7 @@ namespace DocumentQuestions.Function
             string memoryCollectionName = Path.GetFileNameWithoutExtension(name);
 
 
-            semanticMemory.InitMemoryAndKernel();
+            semanticMemory.InitMemoryAndAgents();
 
             string imgUrl = $"https://{storageAccountName}.blob.core.windows.net/raw/{name}";
 

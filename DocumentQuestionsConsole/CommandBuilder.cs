@@ -48,6 +48,9 @@ namespace DocumentQuestions.Console
          clearIndexCommand.Add(clearIndexArg);
          clearIndexCommand.Handler = CommandHandler.Create<string[]>(Worker.ClearIndex);
 
+         var resetCommand = new Command("reset", "Reset the conversation thread to start a new conversation");
+         resetCommand.Handler = CommandHandler.Create(Worker.ResetConversation);
+
 
          RootCommand rootCommand = new RootCommand(description: $"Utility to ask questions on documents that have been indexed in Azure AI Search");
          rootCommand.Add(questionArg);
@@ -57,6 +60,7 @@ namespace DocumentQuestions.Console
          rootCommand.Add(processFileCommand);
          rootCommand.Add(listCommand);
          rootCommand.Add(clearIndexCommand);
+         rootCommand.Add(resetCommand);
          rootCommand.Add(AIRuntimeSetCommand());
 
          var parser = new CommandLineBuilder(rootCommand)

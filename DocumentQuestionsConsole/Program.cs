@@ -7,7 +7,6 @@ using DocumentQuestions.Library;
 using Azure.AI.DocumentIntelligence;
 using Azure;
 using Azure.Identity;
-using Microsoft.SemanticKernel;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry;
@@ -55,17 +54,17 @@ namespace DocumentQuestions.Console
                 .AddService("DocumentQuestions.Console");
 
             // Enable model diagnostics with sensitive data.
-            AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
+            AppContext.SetSwitch("Microsoft.Agents.AI.EnableOTelDiagnosticsSensitive", true);
 
             using var traceProvider = Sdk.CreateTracerProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddSource("Microsoft.SemanticKernel*")
+                .AddSource("Microsoft.Agents.AI*")
                 .AddAzureMonitorTraceExporter(options => options.ConnectionString = connectionString)
                 .Build();
 
             using var meterProvider = Sdk.CreateMeterProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddMeter("Microsoft.SemanticKernel*")
+                .AddMeter("Microsoft.Agents.AI*")
                 .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
                 .Build();
          }
@@ -77,7 +76,6 @@ namespace DocumentQuestions.Console
                services.AddSingleton<SemanticUtility>();
                services.AddSingleton<DocumentIntelligence>();
                services.AddSingleton<AiSearch>();
-               services.AddSingleton<IFunctionInvocationFilter, SkFunctionInvocationFilter>();
                services.AddSingleton(sp =>
                {
                   var config = sp.GetRequiredService<IConfiguration>();
@@ -95,7 +93,6 @@ namespace DocumentQuestions.Console
                 logging.SetMinimumLevel(level);
                 logging.AddFilter("System", LogLevel.Warning);
                 logging.AddFilter("Microsoft", LogLevel.Warning);
-                logging.AddFilter("Microsoft.SemanticKernel", LogLevel.Warning);
                 if (!string.IsNullOrWhiteSpace(connectionString))
                 {
                    logging.AddOpenTelemetry(options =>

@@ -1,4 +1,5 @@
 ﻿using DocumentQuestions.Library;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -22,6 +23,8 @@ namespace DocumentQuestions.Console
       private static DocumentIntelligence documentIntelligence;
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
+      private static AgentThread? currentThread = null; // Thread for multi-turn conversations
+      
       public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, SemanticUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
       {
          log = logger;
@@ -54,9 +57,21 @@ namespace DocumentQuestions.Console
          }
          else
          {
-            await foreach (var bit in semanticUtility.AskQuestionStreaming(quest, docContent))
+            // Use thread-based conversation for follow-up questions
+            StringBuilder responseBuilder = new();
+            await foreach (var (text,thread) in semanticUtility.AskQuestionStreamingWithThread (quest, docContent))
             {
-               syS.Console.Write(bit);
+               syS.Console.Write(text);
+               responseBuilder.Append(text);
+               currentThread = thread; // Update thread for next question
+            }
+            
+            // Display turn count
+            int turnCount = currentThread.Serialize().GetProperty("messages").GetArrayLength();
+            if (turnCount > 2)
+            {
+               syS.Console.WriteLine();
+               log.LogInformation($"[Conversation turn: {turnCount / 2}]", ConsoleColor.DarkGray);
             }
          }
 
@@ -64,6 +79,13 @@ namespace DocumentQuestions.Console
          //syS.Console.WriteLine("PLEASE NOTE: This does not constitue legal advice or counsel.");
          syS.Console.WriteLine("----------------------");
          syS.Console.WriteLine();
+      }
+
+      internal static Task ResetConversation()
+      {
+         currentThread = null;
+         log.LogInformation("Conversation thread reset. Starting fresh conversation.", ConsoleColor.Green);
+         return Task.CompletedTask;
       }
 
       internal static async void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
@@ -101,7 +123,7 @@ namespace DocumentQuestions.Console
 
          if (changed)
          {
-            semanticUtility.InitMemoryAndKernel();
+            semanticUtility.InitMemoryAndAgents();
             ListAiSettings();
          }
       }

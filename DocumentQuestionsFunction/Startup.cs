@@ -6,7 +6,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -43,17 +42,17 @@ namespace DocumentQuestions.Function
                 .AddService("DocumentQuestions.Function");
 
             // Enable model diagnostics with sensitive data.
-            AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
+            AppContext.SetSwitch("Microsoft.Agents.AI.EnableOTelDiagnosticsSensitive", true);
 
             using var traceProvider = Sdk.CreateTracerProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddSource("Microsoft.SemanticKernel*")
+                .AddSource("Microsoft.Agents.AI*")
                 .AddAzureMonitorTraceExporter(options => options.ConnectionString = connectionString)
                 .Build();
 
             using var meterProvider = Sdk.CreateMeterProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddMeter("Microsoft.SemanticKernel*")
+                .AddMeter("Microsoft.Agents.AI*")
                 .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
                 .Build();
          }
@@ -101,7 +100,6 @@ namespace DocumentQuestions.Function
          services.AddSingleton<Common>();
          services.AddSingleton<SemanticUtility>();
          services.AddSingleton<Helper>();
-         services.AddSingleton<IFunctionInvocationFilter, SkFunctionInvocationFilter>();
          services.AddSingleton<DocumentQuestions.Library.DocumentIntelligence>();
          //services.AddSingleton(sp =>
          //{
