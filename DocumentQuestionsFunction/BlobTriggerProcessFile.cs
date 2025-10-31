@@ -16,14 +16,14 @@ namespace DocumentQuestions.Function
 {
    public class BlobTriggerProcessFile
    {
-      private SemanticUtility semanticMemory;
+      private AgentUtility semanticMemory;
       private ILoggerFactory logFactory;
       private ILogger<BlobTriggerProcessFile> log;
       private IConfiguration config;
       //private DocumentIntelligenceClient docIntelClient;
       private Common common;
       private DocumentIntelligence docIntel;
-      public BlobTriggerProcessFile(ILoggerFactory logFactory, IConfiguration config, SemanticUtility semanticMemory, DocumentIntelligence docIntel, Common common)
+      public BlobTriggerProcessFile(ILoggerFactory logFactory, IConfiguration config, AgentUtility semanticMemory, DocumentIntelligence docIntel, Common common)
       {
          this.semanticMemory = semanticMemory;
          this.logFactory = logFactory;

@@ -98,7 +98,7 @@ namespace DocumentQuestions.Function
       private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
       {
          services.AddSingleton<Common>();
-         services.AddSingleton<SemanticUtility>();
+         services.AddSingleton<AgentUtility>();
          services.AddSingleton<Helper>();
          services.AddSingleton<DocumentQuestions.Library.DocumentIntelligence>();
          //services.AddSingleton(sp =>

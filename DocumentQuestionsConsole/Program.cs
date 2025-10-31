@@ -73,7 +73,7 @@ namespace DocumentQuestions.Console
             .ConfigureServices((hostContext, services) =>
             {
                services.AddSingleton<StartArgs>(new StartArgs(args));
-               services.AddSingleton<SemanticUtility>();
+               services.AddSingleton<AgentUtility>();
                services.AddSingleton<DocumentIntelligence>();
                services.AddSingleton<AiSearch>();
                services.AddSingleton(sp =>

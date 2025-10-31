@@ -19,7 +19,7 @@ namespace DocumentQuestions.Function
 
    public class HttpTriggerSemanticKernelAskQuestion
    {
-      private SemanticUtility semanticUtility;
+      private AgentUtility semanticUtility;
       ILogger<HttpTriggerSemanticKernelAskQuestion> log;
       IConfiguration config;
       Helper common;
@@ -27,7 +27,7 @@ namespace DocumentQuestions.Function
       // Static dictionary to store threads per session (in production, use Redis/Cosmos DB)
       private static readonly ConcurrentDictionary<string, AgentThread> _sessionThreads = new();
 
-      public HttpTriggerSemanticKernelAskQuestion(ILogger<HttpTriggerSemanticKernelAskQuestion> log, IConfiguration config, Helper common, SemanticUtility semanticMemory)
+      public HttpTriggerSemanticKernelAskQuestion(ILogger<HttpTriggerSemanticKernelAskQuestion> log, IConfiguration config, Helper common, AgentUtility semanticMemory)
       {
          this.log = log;
          this.config = config;

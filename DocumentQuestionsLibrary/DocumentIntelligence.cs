@@ -31,15 +31,16 @@ namespace DocumentQuestions.Library
       //private ILoggerFactory logFactory;
       private ILogger<DocumentIntelligence> log;
       private IConfiguration config;
-      private SemanticUtility semanticUtility;
+      private AgentUtility agentUtility;
       private Common common;
-
-      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, Common common)
+      private AiSearch aiSearch;
+      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, AgentUtility agentUtility, AiSearch aiSearch, Common common)
       {
          this.log = log;
          this.config = config;
-         this.semanticUtility = semanticUtility;
+         this.agentUtility = agentUtility;
          this.common = common;
+         this.aiSearch = aiSearch;
 
          try
          {
@@ -106,8 +107,8 @@ namespace DocumentQuestions.Library
             var taskList = new List<Task>();
 
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
-            taskList.Add(semanticUtility.StoreMemoryAsync(indexName, Common.BaseFileName(filePathOrUrl), chunked));
-            taskList.Add(semanticUtility.StoreMemoryAsync("general", Common.BaseFileName(filePathOrUrl), chunked));
+            taskList.Add(aiSearch.StoreDataInIndex(indexName, Common.BaseFileName(filePathOrUrl), chunked));
+            taskList.Add(aiSearch.StoreDataInIndex("general", Common.BaseFileName(filePathOrUrl), chunked));
             Task.WaitAll(taskList.ToArray());
          }
          log.LogInformation("Document Processed and Indexed");

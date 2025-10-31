@@ -1,4 +1,5 @@
-﻿using DocumentQuestions.Library;
+﻿using Azure.AI.Agents.Persistent;
+using DocumentQuestions.Library;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -17,22 +18,22 @@ namespace DocumentQuestions.Console
       private static ILoggerFactory logFactory;
       private static IConfiguration config;
       private static StartArgs? startArgs;
-      private static SemanticUtility semanticUtility;
+      private static AgentUtility agentUtility;
       private static Common common;
       private static Parser rootParser;
       private static DocumentIntelligence documentIntelligence;
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
-      private static AgentThread? currentThread = null; // Thread for multi-turn conversations
+      private static ThreadRun? currentThreadRun = null; // Thread for multi-turn conversations
       
-      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, SemanticUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
+      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility agentUtility, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
       {
          log = logger;
          logFactory = loggerFactory;
          config = configuration;
          startArgs = sArgs;
          common = cmn;
-         semanticUtility = semanticUtil;
+         Worker.agentUtility = agentUtility;
          documentIntelligence = documentIntel;
          aiSearch = aiSrch;
       }
@@ -50,31 +51,37 @@ namespace DocumentQuestions.Console
          }
          string quest = string.Join(" ", question);
          syS.Console.WriteLine("----------------------");
-         var docContent = await semanticUtility.SearchForReleventContent(activeDocument, quest);
-         if (string.IsNullOrWhiteSpace(docContent))
-         {
-            log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
-         }
-         else
-         {
+         //var docContent = await agentUtility.SearchForReleventContent(activeDocument, quest);
+         //if (string.IsNullOrWhiteSpace(docContent))
+         //{
+         //   log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
+         //}
+         //else
+         //{
             // Use thread-based conversation for follow-up questions
             StringBuilder responseBuilder = new();
-            await foreach (var (text,thread) in semanticUtility.AskQuestionStreamingWithThread (quest, docContent))
+            await foreach (var (text,thread) in agentUtility.AskQuestionStreamingWithThread (quest, activeDocument, currentThreadRun))
             {
                syS.Console.Write(text);
                responseBuilder.Append(text);
-               currentThread = thread; // Update thread for next question
+               currentThreadRun = thread; // Update thread for next question
             }
             
+            var messages = await agentUtility.GetThreadMessages(currentThreadRun);
+            syS.Console.WriteLine();
+            log.LogInformation($"{messages}", ConsoleColor.DarkGray);
             // Display turn count
-            int turnCount = currentThread.Serialize().GetProperty("messages").GetArrayLength();
-            if (turnCount > 2)
-            {
-               syS.Console.WriteLine();
-               log.LogInformation($"[Conversation turn: {turnCount / 2}]", ConsoleColor.DarkGray);
-            }
-         }
+            //int turnCount = currentThread.Serialize().GetProperty("messages").GetArrayLength();
+            //if (turnCount > 2)
+            //{
+            //   syS.Console.WriteLine();
+            //   log.LogInformation($"[Conversation turn: {turnCount / 2}]", ConsoleColor.DarkGray);
+            //}
+         //}
 
+         syS.Console.WriteLine();
+         var steps = await agentUtility.GetThreadSteps(currentThreadRun);
+         syS.Console.WriteLine(steps);
          syS.Console.WriteLine();
          //syS.Console.WriteLine("PLEASE NOTE: This does not constitue legal advice or counsel.");
          syS.Console.WriteLine("----------------------");
@@ -83,7 +90,7 @@ namespace DocumentQuestions.Console
 
       internal static Task ResetConversation()
       {
-         currentThread = null;
+         currentThreadRun = null;
          log.LogInformation("Conversation thread reset. Starting fresh conversation.", ConsoleColor.Green);
          return Task.CompletedTask;
       }
@@ -123,7 +130,7 @@ namespace DocumentQuestions.Console
 
          if (changed)
          {
-            semanticUtility.InitMemoryAndAgents();
+            agentUtility.InitAgents();
             ListAiSettings();
          }
       }
@@ -197,35 +204,9 @@ namespace DocumentQuestions.Console
             log.LogInformation($"The file {name} doesn't exist. Please enter a valid file name", ConsoleColor.Red);
             return;
          }
+       
+         await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
 
-         if (Path.GetExtension(file).ToLower() == ".xml")
-         {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            StringBuilder sb = new();
-            var content = File.ReadAllText(name);
-            await foreach (var bit in semanticUtility.ExtractContentFromXmlDoc(name, content))
-            {
-               syS.Console.Write(bit);
-               sb.Append(bit);
-            }
-            sw.Stop();
-            syS.Console.WriteLine();
-            
-            log.LogInformation($"Extraction time: {Math.Ceiling(sw.Elapsed.TotalSeconds)} seconds", ConsoleColor.Cyan);
-
-            string indexName = Common.SafeIndexName(file, index);
-            string fileName = Common.BaseFileName(file);
-            List<string> contentlst = new() {  name, sb.ToString() };
-            await semanticUtility.StoreMemoryAsync(indexName, fileName, contentlst);
-            await semanticUtility.StoreMemoryAsync("general", fileName, contentlst);
-
-            return;
-         }
-         else
-         {
-            await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
-         }
       }
 
       internal static void SetActiveDocument(string[] document)
@@ -244,6 +225,9 @@ namespace DocumentQuestions.Console
          bool firstPass = true;
          int fileCount = 0;
          StringBuilder sb;
+
+         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"]);
+        await  local.QuickTestAsync();
          while (true)
          {
             sb = new StringBuilder();
