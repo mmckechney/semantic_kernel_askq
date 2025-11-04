@@ -8,6 +8,8 @@ using System.ComponentModel.Design;
 using System.Text.Json;
 using System.Threading;
 using System.Xml;
+using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace DocumentQuestions.Library
 {
@@ -39,52 +41,375 @@ namespace DocumentQuestions.Library
     {
         private readonly AIProjectClient _projectClient;
         private readonly PersistentAgentsClient _agentsClient;
+        private readonly Dictionary<string, MethodInfo> _toolMethods;
+        private readonly Dictionary<string, object?> _toolInstances;
 
         public LocalFunctionTools(string projectEndpoint, Azure.Core.TokenCredential? credential = null)
         {
             credential ??= new DefaultAzureCredential();
             _projectClient = new AIProjectClient(new Uri(projectEndpoint), credential);
             _agentsClient = _projectClient.GetPersistentAgentsClient();
+            _toolMethods = new Dictionary<string, MethodInfo>();
+            _toolInstances = new Dictionary<string, object?>();
+            
+            // Auto-discover tool methods in this class
+            DiscoverToolMethods();
         }
 
-      [Description("Fetches the weather information for the specified location")]
-      private static string FetchWeather([Description("The location to fetch weather for.")] string location)
-      {
-         // Mock weather data for demonstration purposes
-         var mockWeatherData = new Dictionary<string, string>
+        /// <summary>
+        /// Discovers all methods marked with [Description] attributes as potential tool functions
+        /// </summary>
+        private void DiscoverToolMethods()
+        {
+            var type = this.GetType();
+            var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+
+            foreach (var method in methods)
+            {
+                var descAttr = method.GetCustomAttribute<DescriptionAttribute>();
+                if (descAttr != null)
+                {
+                    var toolName = GetSanitizedToolName(method.Name);
+                    _toolMethods[toolName] = method;
+                    _toolInstances[toolName] = method.IsStatic ? null : this;
+                    
+                    Console.WriteLine($"Discovered tool: {toolName} -> {method.Name}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Registers an external tool method with an instance
+        /// </summary>
+        public void RegisterToolMethod(string toolName, MethodInfo method, object? instance = null)
+        {
+            var sanitizedName = GetSanitizedToolName(toolName);
+            _toolMethods[sanitizedName] = method;
+            _toolInstances[sanitizedName] = instance;
+            
+            Console.WriteLine($"Registered external tool: {sanitizedName} -> {method.DeclaringType?.Name}.{method.Name}");
+        }
+
+        /// <summary>
+        /// Registers multiple tool methods from a delegate
+        /// </summary>
+        public void RegisterToolMethod(string toolName, Delegate toolDelegate)
+        {
+            RegisterToolMethod(toolName, toolDelegate.Method, toolDelegate.Target);
+        }
+
+        /// <summary>
+        /// Gets all discovered tool definitions
+        /// </summary>
+        public IEnumerable<FunctionToolDefinition> GetAllToolDefinitions()
+        {
+            return _toolMethods.Select(kvp => CreateToolDefinitionFromMethod(kvp.Key, kvp.Value));
+        }
+
+        /// <summary>
+        /// Creates a tool definition from a method using reflection
+        /// </summary>
+        private FunctionToolDefinition CreateToolDefinitionFromMethod(string toolName, MethodInfo method)
+        {
+            var description = method.GetCustomAttribute<DescriptionAttribute>()?.Description ?? $"Executes {method.Name}";
+
+            var props = new Dictionary<string, object>();
+            var required = new List<string>();
+
+            foreach (var param in method.GetParameters())
+            {
+                // Skip CancellationToken parameters
+                if (param.ParameterType == typeof(CancellationToken))
+                    continue;
+
+                var paramDesc = param.GetCustomAttribute<DescriptionAttribute>()?.Description ?? param.Name!;
+                var paramType = GetJsonTypeForParameter(param.ParameterType);
+                
+                props[param.Name!] = new { type = paramType, description = paramDesc };
+                
+                if (!param.IsOptional && param.ParameterType != typeof(CancellationToken))
+                    required.Add(param.Name!);
+            }
+
+            // Create schema object conditionally - only include 'required' if there are required parameters
+            object schema;
+            if (required.Count > 0)
+            {
+                schema = new
+                {
+                    type = "object",
+                    properties = props,
+                    required = required.ToArray()
+                };
+            }
+            else
+            {
+                schema = new
+                {
+                    type = "object",
+                    properties = props
+                };
+            }
+
+            return new FunctionToolDefinition(
+                name: toolName,
+                description: description,
+                parameters: BinaryData.FromObjectAsJson(schema, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+            );
+        }
+
+        /// <summary>
+        /// Sanitizes method names to comply with tool naming requirements
+        /// </summary>
+        private static string GetSanitizedToolName(string methodName)
+        {
+            // Remove angle brackets and other invalid characters from lambda/anonymous method names
+            var sanitized = Regex.Replace(methodName, "[^a-zA-Z0-9_-]", "_");
+            sanitized = Regex.Replace(sanitized, "_+", "_").Trim('_');
+            
+            return string.IsNullOrWhiteSpace(sanitized) ? "tool" : sanitized.ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Maps .NET types to JSON schema types
+        /// </summary>
+        private static string GetJsonTypeForParameter(Type paramType)
+        {
+            if (paramType == typeof(int) || paramType == typeof(long) || paramType == typeof(short))
+                return "integer";
+            if (paramType == typeof(double) || paramType == typeof(float) || paramType == typeof(decimal))
+                return "number";
+            if (paramType == typeof(bool))
+                return "boolean";
+            if (paramType.IsArray || (paramType.IsGenericType && typeof(IEnumerable<>).IsAssignableFrom(paramType.GetGenericTypeDefinition())))
+                return "array";
+            
+            return "string";
+        }
+
+        /// <summary>
+        /// Executes a tool call by name using reflection
+        /// </summary>
+        public async Task<string> ExecuteToolCallAsync(string functionName, string argumentsJson)
+        {
+            var toolName = GetSanitizedToolName(functionName);
+            
+            if (!_toolMethods.TryGetValue(toolName, out var method))
+            {
+                return $"Unknown function: {functionName} (sanitized: {toolName})";
+            }
+
+            try
+            {
+                var arguments = ParseArgumentsForMethod(method, argumentsJson);
+                var instance = _toolInstances[toolName];
+                
+                var result = method.Invoke(instance, arguments);
+                
+                // Handle async methods
+                if (result is Task task)
+                {
+                    await task;
+                    
+                    // Get result from Task<T>
+                    if (task.GetType().IsGenericType)
+                    {
+                        var resultProperty = task.GetType().GetProperty("Result");
+                        result = resultProperty?.GetValue(task);
+                    }
+                    else
+                    {
+                        result = "Task completed successfully";
+                    }
+                }
+
+                return SerializeResult(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error executing tool {functionName}: {ex.Message}");
+                return $"Error executing {functionName}: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// Parses JSON arguments and maps them to method parameters
+        /// </summary>
+        private object[] ParseArgumentsForMethod(MethodInfo method, string argumentsJson)
+        {
+            var parameters = method.GetParameters();
+            var arguments = new object[parameters.Length];
+
+            if (string.IsNullOrWhiteSpace(argumentsJson))
+            {
+                // Fill with default values for optional parameters
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    arguments[i] = parameters[i].ParameterType == typeof(CancellationToken) 
+                        ? CancellationToken.None 
+                        : parameters[i].DefaultValue ?? GetDefaultValue(parameters[i].ParameterType);
+                }
+                return arguments;
+            }
+
+            using var doc = JsonDocument.Parse(argumentsJson);
+            var root = doc.RootElement;
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                var param = parameters[i];
+                
+                if (param.ParameterType == typeof(CancellationToken))
+                {
+                    arguments[i] = CancellationToken.None;
+                    continue;
+                }
+
+                if (root.TryGetProperty(param.Name!, out var jsonValue))
+                {
+                    arguments[i] = ConvertJsonValueToType(jsonValue, param.ParameterType);
+                }
+                else if (param.IsOptional)
+                {
+                    arguments[i] = param.DefaultValue ?? GetDefaultValue(param.ParameterType);
+                }
+                else
+                {
+                    throw new ArgumentException($"Missing required parameter: {param.Name}");
+                }
+            }
+
+            return arguments;
+        }
+
+        /// <summary>
+        /// Converts JsonElement to the specified type
+        /// </summary>
+        private object? ConvertJsonValueToType(JsonElement jsonValue, Type targetType)
+        {
+            if (targetType == typeof(string))
+                return jsonValue.GetString();
+            if (targetType == typeof(int))
+                return jsonValue.GetInt32();
+            if (targetType == typeof(long))
+                return jsonValue.GetInt64();
+            if (targetType == typeof(bool))
+                return jsonValue.GetBoolean();
+            if (targetType == typeof(double))
+                return jsonValue.GetDouble();
+            if (targetType == typeof(decimal))
+                return jsonValue.GetDecimal();
+                
+            // For complex types, try JSON deserialization
+            try
+            {
+                return JsonSerializer.Deserialize(jsonValue.GetRawText(), targetType);
+            }
+            catch
+            {
+                return jsonValue.GetString(); // Fallback to string
+            }
+        }
+
+        /// <summary>
+        /// Gets default value for a type
+        /// </summary>
+        private static object? GetDefaultValue(Type type)
+        {
+            return type.IsValueType ? Activator.CreateInstance(type) : null;
+        }
+
+        /// <summary>
+        /// Serializes the result to JSON string format
+        /// </summary>
+        private static string SerializeResult(object? result)
+        {
+            if (result == null)
+                return "null";
+            
+            if (result is string str)
+                return str;
+                
+            try
+            {
+                return JsonSerializer.Serialize(result, new JsonSerializerOptions 
+                { 
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = false 
+                });
+            }
+            catch
+            {
+                return result.ToString() ?? "null";
+            }
+        }
+
+        [Description("Fetches the weather information for the specified location")]
+        private static string FetchWeather([Description("The location to fetch weather for.")] string location)
+        {
+            // Mock weather data for demonstration purposes
+            var mockWeatherData = new Dictionary<string, string>
             {
                 { "New York", "Sunny, 25°C" },
                 { "London", "Cloudy, 18°C" },
                 { "Tokyo", "Rainy, 22°C" },
-               { "Seattle", "Rainy, 10°C" }
+                { "Seattle", "Rainy, 10°C" }
             };
 
-         string weather = mockWeatherData.TryGetValue(location, out string? weatherInfo)
-             ? weatherInfo
-             : "Weather data not available for this location.";
+            string weather = mockWeatherData.TryGetValue(location, out string? weatherInfo)
+                ? weatherInfo
+                : "Weather data not available for this location.";
 
-         var result = new { weather = weather };
-         return JsonSerializer.Serialize(result);
-      }
-      /// <summary>
-      /// Creates a function tool definition for weather lookup
-      /// </summary>
-      public FunctionToolDefinition CreateWeatherToolDefinition()
+            var result = new { weather = weather };
+            return JsonSerializer.Serialize(result);
+        }
+
+        [Description("Calculates the sum of two numbers")]
+        private static string Calculator([Description("First number")] double a, [Description("Second number")] double b, [Description("Operation to perform")] string operation = "add")
         {
-         return AgentUtility.FoundryToolFromMethod(FetchWeather);
-            return new FunctionToolDefinition(
-                name: "get_weather",
-                description: "Returns current weather in a city.",
-                parameters: BinaryData.FromString("""
-                {
-                  "type": "object",
-                  "properties": {
-                    "city":  { "type": "string", "description": "City name" },
-                    "units": { "type": "string", "enum": ["imperial","metric"], "default": "imperial" }
-                  },
-                  "required": ["city"]
-                }
-                """));
+            double result = operation.ToLower() switch
+            {
+                "add" => a + b,
+                "subtract" => a - b,
+                "multiply" => a * b,
+                "divide" => b != 0 ? a / b : throw new ArgumentException("Cannot divide by zero"),
+                _ => throw new ArgumentException($"Unknown operation: {operation}")
+            };
+
+            return JsonSerializer.Serialize(new { operation, a, b, result });
+        }
+
+        [Description("Gets the current date and time")]
+        private static string GetCurrentDateTime([Description("Format for the date/time")] string format = "yyyy-MM-dd HH:mm:ss")
+        {
+            try
+            {
+                var now = DateTime.Now;
+                return JsonSerializer.Serialize(new { 
+                    formatted = now.ToString(format),
+                    utc = now.ToUniversalTime().ToString("o"),
+                    timestamp = ((DateTimeOffset)now).ToUnixTimeSeconds()
+                });
+            }
+            catch (Exception ex)
+            {
+                return JsonSerializer.Serialize(new { error = ex.Message, defaultFormat = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            }
+        }
+        /// <summary>
+        /// Creates a function tool definition for weather lookup
+        /// </summary>
+        public FunctionToolDefinition CreateWeatherToolDefinition()
+        {
+            // Use the new reflection-based approach
+            var method = typeof(LocalFunctionTools).GetMethod("FetchWeather", BindingFlags.NonPublic | BindingFlags.Static);
+            if (method != null)
+            {
+                return CreateToolDefinitionFromMethod("fetchweather", method);
+            }
+
+            // Fallback to the old method if reflection fails
+            return AgentUtility.FoundryToolFromMethod(FetchWeather);
         }
 
         /// <summary>
@@ -112,6 +437,43 @@ namespace DocumentQuestions.Library
                 description: $"Agent: {name}",
                 instructions: instructions,
                 tools: new[] { tool });
+            
+            return agent;
+        }
+
+        /// <summary>
+        /// Creates an agent with multiple tools
+        /// </summary>
+        public async Task<AIAgent> CreateAgentWithMultipleToolsAsync(string model, string name, string instructions, params FunctionToolDefinition[] tools)
+        {
+            var agent = await _agentsClient.CreateAIAgentAsync(
+                model: model,
+                name: name,
+                description: $"Agent: {name}",
+                instructions: instructions,
+                tools: tools);
+            
+            return agent;
+        }
+
+        /// <summary>
+        /// Creates an agent with all discovered tools
+        /// </summary>
+        public async Task<AIAgent> CreateAgentWithAllToolsAsync(string model, string name, string instructions)
+        {
+            var tools = GetAllToolDefinitions().ToArray();
+            Console.WriteLine($"Creating agent with {tools.Length} discovered tools:");
+            foreach (var tool in tools)
+            {
+                Console.WriteLine($"  - {tool.Name}: {tool.Description}");
+            }
+            
+            var agent = await _agentsClient.CreateAIAgentAsync(
+                model: model,
+                name: name,
+                description: $"Agent: {name}",
+                instructions: instructions,
+                tools: tools);
             
             return agent;
         }
@@ -207,190 +569,127 @@ namespace DocumentQuestions.Library
         /// <returns>The agent's response as a string</returns>
         public async Task<string> TestWeatherAgentWithManualToolHandlingAsync(string model, string question)
         {
-            Console.WriteLine("=== Testing ProcessToolCall Method ===\n");
+            Console.WriteLine("=== Testing Generic Tool Execution ===\n");
             
-            // 1. Demonstrate the ProcessToolCall method with sample tool call data
-            Console.WriteLine("Simulating tool call interception and processing...\n");
-            
-            // Example 1: Weather query in imperial units
-            var toolCall1Args = """
-                {
-                  "city": "Seattle",
-                  "units": "imperial"
-                }
-                """;
-            
-            Console.WriteLine($"Tool Call 1 - Function: get_weather");
-            Console.WriteLine($"Arguments: {toolCall1Args}");
-            
-            var result1 = ProcessToolCall(
-                functionName: "get_weather",
-                arguments: toolCall1Args,
-                toolHandler: (city, units) =>
-                {
-                    Console.WriteLine($"→ Executing weather lookup for {city} in {units} units");
-                    return ExecuteWeatherTool($"{{\"city\":\"{city}\",\"units\":\"{units}\"}}");
-                }
-            );
-            
-            Console.WriteLine($"Result 1: {result1}\n");
+            // Demonstrate the reflection-based tool execution
+            Console.WriteLine("Available tools:");
+            var toolDefinitions = GetAllToolDefinitions();
+            foreach (var tool in toolDefinitions)
+            {
+                Console.WriteLine($"  - {tool.Name}: {tool.Description}");
+            }
+            Console.WriteLine();
 
-            // Example 2: Weather query in metric units
-            var toolCall2Args = """
-                {
-                  "city": "New York",
-                  "units": "metric"
-                }
-                """;
-            
-            Console.WriteLine($"Tool Call 2 - Function: get_weather");
-            Console.WriteLine($"Arguments: {toolCall2Args}");
-            
-            var result2 = ProcessToolCall(
-                functionName: "get_weather",
-                arguments: toolCall2Args,
-                toolHandler: (city, units) =>
-                {
-                    Console.WriteLine($"→ Executing weather lookup for {city} in {units} units");
-                    return ExecuteWeatherTool($"{{\"city\":\"{city}\",\"units\":\"{units}\"}}");
-                }
-            );
-            
-            Console.WriteLine($"Result 2: {result2}\n");
-
-            // 2. Now test with actual agent (uses automatic tool handling)
-            Console.WriteLine("=== Now testing with actual AIAgent (automatic tool handling) ===\n");
-            
             string agentId = string.Empty;
+            PersistentAgentThread? thread = null;
+
             try
             {
-                var weatherTool = CreateWeatherToolDefinition();
-                var agent = await CreateAgentWithToolsAsync(
+                // Create agent with all discovered tools (not just weather)
+                var agent = await CreateAgentWithAllToolsAsync(
                     model: model,
-                    name: "WeatherBotProcessToolDemo",
-                    instructions: "You are a helpful weather assistant. Use the get_weather tool to answer weather questions.",
-                    tool: weatherTool
+                    name: "GenericToolAgent",
+                    instructions: "You are a helpful assistant with access to various tools. Use the appropriate tools to answer user questions."
                 );
 
                 agentId = agent.Id;
-                Console.WriteLine($"✓ Created agent: {agent.Name} (ID: {agentId})\n");
+                Console.WriteLine($"✓ Created agent: {agent.Name} (ID: {agentId}) with {toolDefinitions.Count()} tools\n");
 
-                // Use RunStreamingAsync which handles tool calls automatically
-                var fullResponse = new System.Text.StringBuilder();
                 Console.WriteLine($"Question: {question}");
                 Console.WriteLine($"--- Agent Response ---");
 
+                // Create thread and run
+                thread = await _agentsClient.Threads.CreateThreadAsync();
+                Console.WriteLine($"Created thread, ID: {thread.Id}");
 
-            //var threadRunResponse = _agentsClient.CreateThreadAndRun(agentId, new ThreadAndRunOptions());
-            //var threadRun = threadRunResponse.Value;
+                var messageResponse = _agentsClient.Messages.CreateMessage(threadId: thread.Id, role: MessageRole.User, content: question);
+                ThreadRun threadRun = await _agentsClient.Runs.CreateRunAsync(thread.Id, agent.Id);
 
-            PersistentAgentThread thread = await _agentsClient.Threads.CreateThreadAsync();
-            Console.WriteLine($"Created thread, ID: {thread.Id}");
+                // Process with generic tool handling
+                List<RunStatus> activeStatus = [RunStatus.Queued, RunStatus.InProgress, RunStatus.RequiresAction];
+                while (activeStatus.Contains(threadRun.Status))
+                {
+                    await Task.Delay(1000);
+                    threadRun = await _agentsClient.Runs.GetRunAsync(threadRun.ThreadId, threadRun.Id);
 
-            var messageResponse = _agentsClient.Messages.CreateMessage(threadId: thread.Id, role: MessageRole.User, content: question);
-            var messageValue = messageResponse.Value;
+                    if (threadRun.Status == RunStatus.RequiresAction
+                        && threadRun.RequiredAction is SubmitToolOutputsAction submitToolOutputsAction)
+                    {
+                        Console.WriteLine("Run requires action - processing function calls...");
+                        List<ToolOutput> toolOutputs = new List<ToolOutput>();
 
-            ThreadRun threadRun = await _agentsClient.Runs.CreateRunAsync(thread.Id, agent.Id);
-
-            List<RunStatus> activeStatus = [RunStatus.Queued, RunStatus.InProgress, RunStatus.RequiresAction];
-            while (activeStatus.Contains(threadRun.Status))
-            {
-               await Task.Delay(1000); // Wait 1 second before polling again
-               threadRun = await _agentsClient.Runs.GetRunAsync(threadRun.ThreadId, threadRun.Id);
-
-               if (threadRun.Status == RunStatus.RequiresAction
-                   && threadRun.RequiredAction is SubmitToolOutputsAction submitToolOutputsAction)
-               {
-                  Console.WriteLine("Run requires action - processing function calls...");
-
-                  List<ToolOutput> toolOutputs = new List<ToolOutput>();
-
-                  foreach (RequiredToolCall toolCall in submitToolOutputsAction.ToolCalls)
-                  {
-                     if (toolCall is RequiredFunctionToolCall functionToolCall)
-                     {
-                        if (functionToolCall.Name.ToLower() == "fetchweather")
+                        foreach (RequiredToolCall toolCall in submitToolOutputsAction.ToolCalls)
                         {
-                           // Parse the arguments to get the location
-                           string location = "New York"; // Default location
-                           if (!string.IsNullOrEmpty(functionToolCall.Arguments))
-                           {
-                              try
-                              {
-                                 using JsonDocument argumentsJson = JsonDocument.Parse(functionToolCall.Arguments);
-                                 if (argumentsJson.RootElement.TryGetProperty("location", out JsonElement locationElement))
-                                 {
-                                    location = locationElement.GetString() ?? "New York";
-                                 }
-                              }
-                              catch (JsonException ex)
-                              {
-                                 Console.WriteLine($"Error parsing function arguments: {ex.Message}");
-                              }
-                           }
-
-                           // Execute the fetch weather function
-                           string weatherResult = FetchWeather(location);
-                           toolOutputs.Add(new ToolOutput(toolCall, weatherResult));
-                           Console.WriteLine($"Executed fetchWeather for {location}");
+                            if (toolCall is RequiredFunctionToolCall functionToolCall)
+                            {
+                                Console.WriteLine($"Processing tool call: {functionToolCall.Name}");
+                                Console.WriteLine($"Arguments: {functionToolCall.Arguments}");
+                                
+                                try
+                                {
+                                    // Use the generic tool execution method - works for ANY discovered tool
+                                    string toolResult = await ExecuteToolCallAsync(functionToolCall.Name, functionToolCall.Arguments ?? "{}");
+                                    toolOutputs.Add(new ToolOutput(toolCall, toolResult));
+                                    Console.WriteLine($"✓ Executed {functionToolCall.Name} successfully");
+                                    Console.WriteLine($"Result: {toolResult}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"❌ Error executing tool {functionToolCall.Name}: {ex.Message}");
+                                    string errorResult = $"Error: {ex.Message}";
+                                    toolOutputs.Add(new ToolOutput(toolCall, errorResult));
+                                }
+                            }
                         }
-                     }
-                  }
 
-                  // Submit the tool outputs back to the run
-                  if (toolOutputs.Count > 0)
-                  {
-                     threadRun = await _agentsClient.Runs.SubmitToolOutputsToRunAsync(threadRun, toolOutputs);
-                     Console.WriteLine("Submitted tool outputs");
-                  }
-               }
-               else
-               {
+                        if (toolOutputs.Count > 0)
+                        {
+                            threadRun = await _agentsClient.Runs.SubmitToolOutputsToRunAsync(threadRun, toolOutputs);
+                            Console.WriteLine("Submitted tool outputs");
+                        }
+                    }
+                }
 
-               }
-            }
-
-
-
-            Pageable<PersistentThreadMessage> messages = _agentsClient.Messages.GetMessages(
+                // Get final response
+                Pageable<PersistentThreadMessage> messages = _agentsClient.Messages.GetMessages(
                     threadId: thread.Id,
                     order: ListSortOrder.Ascending
                 );
 
-            string? agentResponse = null;
-            foreach (PersistentThreadMessage threadMessage in messages)
-            {
-               foreach (MessageContent content in threadMessage.ContentItems)
-               {
-                  if (content is MessageTextContent textItem)
-                  {
-                     Console.WriteLine($"Role: {threadMessage.Role}, Content: {textItem.Text}");
+                string? agentResponse = null;
+                foreach (PersistentThreadMessage threadMessage in messages)
+                {
+                    foreach (MessageContent content in threadMessage.ContentItems)
+                    {
+                        if (content is MessageTextContent textItem)
+                        {
+                            Console.WriteLine($"Role: {threadMessage.Role}, Content: {textItem.Text}");
 
-                     // Capture the agent's response
-                     if (threadMessage.Role.ToString().ToLower() == "assistant")
-                     {
-                        agentResponse = textItem.Text;
-                     }
-                  }
-               }
-            }
+                            if (threadMessage.Role.ToString().ToLower() == "assistant")
+                            {
+                                agentResponse = textItem.Text;
+                            }
+                        }
+                    }
+                }
 
-            // Now you can use the agent response
-            if (!string.IsNullOrEmpty(agentResponse))
-            {
-               Console.WriteLine("\n=== AGENT OUTPUT ===");
-               Console.WriteLine(agentResponse);
-               Console.WriteLine("==================");
+                if (!string.IsNullOrEmpty(agentResponse))
+                {
+                    Console.WriteLine("\n=== AGENT OUTPUT ===");
+                    Console.WriteLine(agentResponse);
+                    Console.WriteLine("==================");
+                }
+                
+                return agentResponse ?? "No response received";
             }
-            return agentResponse;
-         }
-         catch (Exception exe)
-         {
-            Console.WriteLine(exe.ToString());
-            return "";
-         }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error: {ex}");
+                return $"Error: {ex.Message}";
+            }
             finally
             {
+                // Cleanup
                 if (!string.IsNullOrEmpty(agentId))
                 {
                     try
@@ -401,6 +700,19 @@ namespace DocumentQuestions.Library
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Warning: Failed to delete agent: {ex.Message}");
+                    }
+                }
+
+                if (thread != null)
+                {
+                    try
+                    {
+                        await DeleteThreadAsync(thread.Id);
+                        Console.WriteLine($"✓ Deleted thread: {thread.Id}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Warning: Failed to delete thread: {ex.Message}");
                     }
                 }
             }
@@ -553,6 +865,152 @@ namespace DocumentQuestions.Library
                 model: model,
                 question: "What's the weather like in Seattle?"
             );
+        }
+
+        /// <summary>
+        /// Tests an agent with all discovered tools using the generic tool execution
+        /// </summary>
+        public async Task<string> TestAgentWithAllToolsAsync(string model, string question)
+        {
+            string agentId = string.Empty;
+            PersistentAgentThread? thread = null;
+
+            try
+            {
+                // Create agent with all discovered tools
+                var agent = await CreateAgentWithAllToolsAsync(
+                    model: model,
+                    name: "GenericToolAgent",
+                    instructions: "You are a helpful assistant with access to various tools. Use the appropriate tools to answer user questions."
+                );
+
+                agentId = agent.Id;
+                Console.WriteLine($"✓ Created agent: {agent.Name} (ID: {agentId})\n");
+
+                // Create thread and run
+                thread = await _agentsClient.Threads.CreateThreadAsync();
+                Console.WriteLine($"Created thread, ID: {thread.Id}");
+
+                var messageResponse = _agentsClient.Messages.CreateMessage(threadId: thread.Id, role: MessageRole.User, content: question);
+                ThreadRun threadRun = await _agentsClient.Runs.CreateRunAsync(thread.Id, agent.Id);
+
+                // Process with generic tool handling
+                List<RunStatus> activeStatus = [RunStatus.Queued, RunStatus.InProgress, RunStatus.RequiresAction];
+                while (activeStatus.Contains(threadRun.Status))
+                {
+                    await Task.Delay(1000);
+                    threadRun = await _agentsClient.Runs.GetRunAsync(threadRun.ThreadId, threadRun.Id);
+
+                    if (threadRun.Status == RunStatus.RequiresAction
+                        && threadRun.RequiredAction is SubmitToolOutputsAction submitToolOutputsAction)
+                    {
+                        Console.WriteLine("Run requires action - processing function calls...");
+                        List<ToolOutput> toolOutputs = new List<ToolOutput>();
+
+                        foreach (RequiredToolCall toolCall in submitToolOutputsAction.ToolCalls)
+                        {
+                            if (toolCall is RequiredFunctionToolCall functionToolCall)
+                            {
+                                Console.WriteLine($"Processing tool call: {functionToolCall.Name}");
+                                
+                                try
+                                {
+                                    // Use the generic tool execution method
+                                    string toolResult = await ExecuteToolCallAsync(functionToolCall.Name, functionToolCall.Arguments ?? "{}");
+                                    toolOutputs.Add(new ToolOutput(toolCall, toolResult));
+                                    Console.WriteLine($"Executed {functionToolCall.Name} successfully");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Error executing tool {functionToolCall.Name}: {ex.Message}");
+                                    string errorResult = $"Error: {ex.Message}";
+                                    toolOutputs.Add(new ToolOutput(toolCall, errorResult));
+                                }
+                            }
+                        }
+
+                        if (toolOutputs.Count > 0)
+                        {
+                            threadRun = await _agentsClient.Runs.SubmitToolOutputsToRunAsync(threadRun, toolOutputs);
+                            Console.WriteLine("Submitted tool outputs");
+                        }
+                    }
+                }
+
+                // Get final response
+                Pageable<PersistentThreadMessage> messages = _agentsClient.Messages.GetMessages(
+                    threadId: thread.Id,
+                    order: ListSortOrder.Ascending
+                );
+
+                string? agentResponse = null;
+                foreach (PersistentThreadMessage threadMessage in messages)
+                {
+                    foreach (MessageContent content in threadMessage.ContentItems)
+                    {
+                        if (content is MessageTextContent textItem)
+                        {
+                            Console.WriteLine($"Role: {threadMessage.Role}, Content: {textItem.Text}");
+
+                            if (threadMessage.Role.ToString().ToLower() == "assistant")
+                            {
+                                agentResponse = textItem.Text;
+                            }
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(agentResponse))
+                {
+                    Console.WriteLine("\n=== AGENT OUTPUT ===");
+                    Console.WriteLine(agentResponse);
+                    Console.WriteLine("==================");
+                }
+                
+                return agentResponse ?? "No response received";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in TestAgentWithAllToolsAsync: {ex}");
+                return $"Error: {ex.Message}";
+            }
+            finally
+            {
+                // Cleanup
+                if (!string.IsNullOrEmpty(agentId))
+                {
+                    try
+                    {
+                        await DeleteAgentAsync(agentId);
+                        Console.WriteLine($"\n✓ Deleted agent: {agentId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Warning: Failed to delete agent: {ex.Message}");
+                    }
+                }
+
+                if (thread != null)
+                {
+                    try
+                    {
+                        await DeleteThreadAsync(thread.Id);
+                        Console.WriteLine($"✓ Deleted thread: {thread.Id}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Warning: Failed to delete thread: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Quick test with all tools
+        /// </summary>
+        public async Task<string> QuickTestAllToolsAsync(string model = "gpt-4o", string question = "What's the weather in Seattle? Also, what's 15 + 27? And what time is it?")
+        {
+            return await TestAgentWithAllToolsAsync(model, question);
         }
     }
 }
