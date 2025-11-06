@@ -25,8 +25,10 @@ namespace DocumentQuestions.Console
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
       private static ThreadRun? currentThreadRun = null; // Thread for multi-turn conversations
-      
-      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility agentUtility, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
+      private static TestGenericTools toolTest;
+
+
+      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility agentUtility, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch, TestGenericTools toolTest)
       {
          log = logger;
          logFactory = loggerFactory;
@@ -36,6 +38,7 @@ namespace DocumentQuestions.Console
          Worker.agentUtility = agentUtility;
          documentIntelligence = documentIntel;
          aiSearch = aiSrch;
+         Worker.toolTest = toolTest;
       }
 
       internal static async Task AskQuestion(string[] question)
@@ -217,9 +220,11 @@ namespace DocumentQuestions.Console
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
+         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"]);
+         await local.QuickTestAsync();
 
-         await TestGenericTools.Main([]);
-         return;
+         //await toolTest.Main([]);
+         //return;
 
          Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
          rootParser = CommandBuilder.BuildCommandLine();
@@ -230,8 +235,8 @@ namespace DocumentQuestions.Console
          int fileCount = 0;
          StringBuilder sb;
 
-         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"]);
-        await  local.QuickTestAsync();
+
+         return;
          while (true)
          {
             sb = new StringBuilder();

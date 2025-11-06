@@ -1,4 +1,7 @@
+using Azure.Storage.Blobs.Models;
 using DocumentQuestions.Library;
+using Microsoft.Extensions.Configuration;
+using OpenTelemetry.Trace;
 using System;
 using System.Threading.Tasks;
 
@@ -9,10 +12,15 @@ namespace DocumentQuestions.Library
     /// </summary>
     public class TestGenericTools
     {
-        public static async Task Main(string[] args)
+      private IConfiguration config;
+      public TestGenericTools(IConfiguration config)
+      {
+         this.config = config;
+      }
+        public async Task Main(string[] args)
         {
             // Set up environment (replace with your actual endpoint)
-            var endpoint = Environment.GetEnvironmentVariable("AIFOUNDRY_ENDPOINT") 
+            var endpoint = config["AIFOUNDRY_ENDPOINT"] 
                 ?? "https://your-project.region.models.ai.azure.com";
 
             Console.WriteLine("=== Testing Generic Tool System ===\n");

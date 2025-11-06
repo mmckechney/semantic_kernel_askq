@@ -76,6 +76,7 @@ namespace DocumentQuestions.Console
                services.AddSingleton<AgentUtility>();
                services.AddSingleton<DocumentIntelligence>();
                services.AddSingleton<AiSearch>();
+               services.AddSingleton<TestGenericTools>();
                services.AddSingleton(sp =>
                {
                   var config = sp.GetRequiredService<IConfiguration>();
