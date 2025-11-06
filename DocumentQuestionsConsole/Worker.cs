@@ -217,6 +217,10 @@ namespace DocumentQuestions.Console
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
+
+         await TestGenericTools.Main([]);
+         return;
+
          Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
          rootParser = CommandBuilder.BuildCommandLine();
          string[] args = startArgs.Args;
