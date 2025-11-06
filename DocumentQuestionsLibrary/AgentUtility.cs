@@ -25,6 +25,7 @@ namespace DocumentQuestions.Library
       IConfiguration config;
       ILoggerFactory logFactory;
       Common common;
+      LocalToolsUtility localToolsUtility;
 
       // Prompt templates as constants (converted from YAML)
       private const string AskQuestionsInstructions = @"You are a document answering bot.
@@ -39,7 +40,7 @@ Do not return social security numbers. If you find one, only the last four digit
       AIProjectClient foundryProject;
       PersistentAgentsClient foundryAgentsClient;
 
-      public AgentUtility(ILoggerFactory logFactory, IConfiguration config, Common common, AiSearch aiSearchAdmin)
+      public AgentUtility(ILoggerFactory logFactory, IConfiguration config, Common common, AiSearch aiSearchAdmin, LocalToolsUtility localToolsUtility)
       {
          log = logFactory.CreateLogger<AgentUtility>();
          this.config = config;
@@ -49,6 +50,8 @@ Do not return social security numbers. If you find one, only the last four digit
 
          this.foundryProject = new AIProjectClient(new Uri(config["AIFOUNDRY_ENDPOINT"]), new DefaultAzureCredential());
          this.foundryAgentsClient = foundryProject.GetPersistentAgentsClient();
+
+         this.localToolsUtility = localToolsUtility;
 
          InitAgents().GetAwaiter().GetResult();
       }
@@ -117,7 +120,7 @@ Do not return social security numbers. If you find one, only the last four digit
          askQuestionsAgent = await GetFoundryAgent("AskQuestions");
          if (askQuestionsAgent == null)
          {
-            var tool = FoundryToolFromMethod((Func<string, string, CancellationToken, IReadOnlyList<SemanticMemoryResult>>)aiSearchAdmin.SearchIndexAsync);
+            var tool = localToolsUtility.FoundryToolFromMethod((Func<string, string, CancellationToken, IReadOnlyList<SemanticMemoryResult>>)aiSearchAdmin.SearchIndexAsync);
 
             //var tool = FoundryToolFromMethod(
             //    (Func<string, string, CancellationToken, IReadOnlyList<SemanticMemoryResult>>)
@@ -251,55 +254,7 @@ Do not return social security numbers. If you find one, only the last four digit
       }
 
 
-      public static FunctionToolDefinition FoundryToolFromMethod(Delegate method)
-      {
-         var mi = method.Method;
-         var rawName = mi.Name;
-         var methodDesc = mi.GetCustomAttribute<DescriptionAttribute>()?.Description
-                          ?? $"Invoke {rawName}";
 
-         // Sanitize name to comply with pattern ^[a-zA-Z0-9_-]+$
-         // Lambdas / local functions often have chars like '<', '>', '|', etc.
-         var sanitized = Regex.Replace(rawName, "[^a-zA-Z0-9_-]", "_");
-         // Collapse multiple underscores
-         sanitized = Regex.Replace(sanitized, "_+", "_");
-         // Avoid leading underscore only name by providing a fallback
-         if (string.IsNullOrWhiteSpace(sanitized))
-         {
-            sanitized = "tool";
-         }
-
-         // Build a minimal JSON schema for parameters
-         var props = new Dictionary<string, object?>();
-         var required = new List<string>();
-
-         foreach (var p in mi.GetParameters())
-         {
-            var pDesc = p.GetCustomAttribute<DescriptionAttribute>()?.Description ?? p.Name!;
-            var type = p.ParameterType == typeof(int) ? "integer"
-                     : p.ParameterType == typeof(double) ? "number"
-                     : p.ParameterType == typeof(bool) ? "boolean"
-                     : "string"; // simple map; extend as needed
-
-            props[p.Name!] = new { type, description = pDesc };
-            if (!p.IsOptional) required.Add(p.Name!);
-         }
-
-         var schema = new
-         {
-            type = "object",
-            properties = props,
-            required = required.Count > 0 ? required : null
-         };
-
-         var tool = new FunctionToolDefinition(
-             name: sanitized,
-             description: methodDesc,
-             parameters: BinaryData.FromObjectAsJson(schema,
-                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-         ); 
-         return tool;
-      }
 
 
    }

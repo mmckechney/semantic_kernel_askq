@@ -4,6 +4,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Identity.Client;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
 using System.Reflection;
@@ -25,10 +26,12 @@ namespace DocumentQuestions.Console
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
       private static ThreadRun? currentThreadRun = null; // Thread for multi-turn conversations
-      private static TestGenericTools toolTest;
+      private static LocalToolsUtility localToolsUtility;
+      private static LocalToolsLibrary localToolsLibrary;
 
 
-      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility agentUtility, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch, TestGenericTools toolTest)
+
+      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility agentUtility, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch, LocalToolsUtility localToolsUtility, LocalToolsLibrary localToolsLibrary)
       {
          log = logger;
          logFactory = loggerFactory;
@@ -38,7 +41,9 @@ namespace DocumentQuestions.Console
          Worker.agentUtility = agentUtility;
          documentIntelligence = documentIntel;
          aiSearch = aiSrch;
-         Worker.toolTest = toolTest;
+         Worker.localToolsUtility = localToolsUtility;
+         Worker.localToolsLibrary = localToolsLibrary;
+
       }
 
       internal static async Task AskQuestion(string[] question)
@@ -220,11 +225,9 @@ namespace DocumentQuestions.Console
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
-         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"]);
+         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"], localToolsUtility);
          await local.QuickTestAsync();
-
-         //await toolTest.Main([]);
-         //return;
+         return;
 
          Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
          rootParser = CommandBuilder.BuildCommandLine();
