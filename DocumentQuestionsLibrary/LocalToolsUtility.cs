@@ -13,13 +13,10 @@ namespace DocumentQuestions.Library
 {
    public class LocalToolsUtility
    {
-      private readonly LocalToolsLibrary localToolsLibrary;
-      public LocalToolsUtility(LocalToolsLibrary localToolsLibrary)
+      public LocalToolsUtility()
       {
          _toolMethods = new Dictionary<string, MethodInfo>();
          _toolInstances = new Dictionary<string, object?>();
-         this.localToolsLibrary = localToolsLibrary;
-         DiscoverToolMethods();
       }
 
       private readonly Dictionary<string, MethodInfo> _toolMethods;
@@ -70,6 +67,26 @@ namespace DocumentQuestions.Library
          }
       }
 
+
+      /// <summary>
+      /// Discovers all methods marked with [Description] attributes as potential tool functions
+      /// </summary>
+      public void RegisterLocalToolMethods(Type type, Object typeInstance)
+      {
+         //var type = localToolsLibrary.GetType();
+         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+
+         foreach (var method in methods)
+         {
+            var descAttr = method.GetCustomAttribute<DescriptionAttribute>();
+            if (descAttr != null)
+            {
+               var toolName = GetSanitizedToolName(method.Name);
+               RegisterToolMethod(toolName, method, method.IsStatic ? null : typeInstance);
+            }
+         }
+      }
+
       /// <summary>
       /// Maps .NET types to JSON schema types
       /// </summary>
@@ -89,7 +106,7 @@ namespace DocumentQuestions.Library
       /// <summary>
       /// Gets all discovered tool definitions
       /// </summary>
-      public IEnumerable<FunctionToolDefinition> GetAllToolDefinitions()
+      public IEnumerable<FunctionToolDefinition> GetRegisterLocalToolDefinitions()
       {
          return _toolMethods.Select(kvp => CreateToolDefinitionFromMethod(kvp.Key, kvp.Value));
       }
@@ -259,28 +276,6 @@ namespace DocumentQuestions.Library
 
 
       /// <summary>
-      /// Discovers all methods marked with [Description] attributes as potential tool functions
-      /// </summary>
-      public void DiscoverToolMethods()
-      {
-         var type = localToolsLibrary.GetType();
-         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-
-         foreach (var method in methods)
-         {
-            var descAttr = method.GetCustomAttribute<DescriptionAttribute>();
-            if (descAttr != null)
-            {
-               var toolName = GetSanitizedToolName(method.Name);
-               _toolMethods[toolName] = method;
-               _toolInstances[toolName] = method.IsStatic ? null : localToolsLibrary;
-
-               Console.WriteLine($"Discovered tool: {toolName} -> {method.Name}");
-            }
-         }
-      }
-
-      /// <summary>
       /// Sanitizes method names to comply with tool naming requirements
       /// </summary>
       private static string GetSanitizedToolName(string methodName)
@@ -294,7 +289,7 @@ namespace DocumentQuestions.Library
       /// <summary>
       /// Registers an external tool method with an instance
       /// </summary>
-      public void RegisterToolMethod(string toolName, MethodInfo method, object? instance = null)
+      private void RegisterToolMethod(string toolName, MethodInfo method, object? instance = null)
       {
          var sanitizedName = GetSanitizedToolName(toolName);
          _toolMethods[sanitizedName] = method;
@@ -309,6 +304,12 @@ namespace DocumentQuestions.Library
       public void RegisterToolMethod(string toolName, Delegate toolDelegate)
       {
          RegisterToolMethod(toolName, toolDelegate.Method, toolDelegate.Target);
+      }
+      public FunctionToolDefinition CreateToolDefinitionFromMethod(Delegate method)
+      {
+         var toolName = GetSanitizedToolName(method.Method.Name);
+         RegisterToolMethod(toolName, method.Method, method.Target);
+         return CreateToolDefinitionFromMethod(toolName, method.Method);
       }
 
 
@@ -331,54 +332,54 @@ namespace DocumentQuestions.Library
          }
       }
 
-      public FunctionToolDefinition FoundryToolFromMethod(Delegate method)
-      {
-         var mi = method.Method;
-         var rawName = mi.Name;
-         var methodDesc = mi.GetCustomAttribute<DescriptionAttribute>()?.Description
-                          ?? $"Invoke {rawName}";
+      //public FunctionToolDefinition CreateToolDefinitionFromMethod(Delegate method)
+      //{
+      //   var mi = method.Method;
+      //   var rawName = mi.Name;
+      //   var methodDesc = mi.GetCustomAttribute<DescriptionAttribute>()?.Description
+      //                    ?? $"Invoke {rawName}";
 
-         // Sanitize name to comply with pattern ^[a-zA-Z0-9_-]+$
-         // Lambdas / local functions often have chars like '<', '>', '|', etc.
-         var sanitized = Regex.Replace(rawName, "[^a-zA-Z0-9_-]", "_");
-         // Collapse multiple underscores
-         sanitized = Regex.Replace(sanitized, "_+", "_");
-         // Avoid leading underscore only name by providing a fallback
-         if (string.IsNullOrWhiteSpace(sanitized))
-         {
-            sanitized = "tool";
-         }
+      //   // Sanitize name to comply with pattern ^[a-zA-Z0-9_-]+$
+      //   // Lambdas / local functions often have chars like '<', '>', '|', etc.
+      //   var sanitized = Regex.Replace(rawName, "[^a-zA-Z0-9_-]", "_");
+      //   // Collapse multiple underscores
+      //   sanitized = Regex.Replace(sanitized, "_+", "_");
+      //   // Avoid leading underscore only name by providing a fallback
+      //   if (string.IsNullOrWhiteSpace(sanitized))
+      //   {
+      //      sanitized = "tool";
+      //   }
 
-         // Build a minimal JSON schema for parameters
-         var props = new Dictionary<string, object?>();
-         var required = new List<string>();
+      //   // Build a minimal JSON schema for parameters
+      //   var props = new Dictionary<string, object?>();
+      //   var required = new List<string>();
 
-         foreach (var p in mi.GetParameters())
-         {
-            var pDesc = p.GetCustomAttribute<DescriptionAttribute>()?.Description ?? p.Name!;
-            var type = p.ParameterType == typeof(int) ? "integer"
-                     : p.ParameterType == typeof(double) ? "number"
-                     : p.ParameterType == typeof(bool) ? "boolean"
-                     : "string"; // simple map; extend as needed
+      //   foreach (var p in mi.GetParameters())
+      //   {
+      //      var pDesc = p.GetCustomAttribute<DescriptionAttribute>()?.Description ?? p.Name!;
+      //      var type = p.ParameterType == typeof(int) ? "integer"
+      //               : p.ParameterType == typeof(double) ? "number"
+      //               : p.ParameterType == typeof(bool) ? "boolean"
+      //               : "string"; // simple map; extend as needed
 
-            props[p.Name!] = new { type, description = pDesc };
-            if (!p.IsOptional) required.Add(p.Name!);
-         }
+      //      props[p.Name!] = new { type, description = pDesc };
+      //      if (!p.IsOptional) required.Add(p.Name!);
+      //   }
 
-         var schema = new
-         {
-            type = "object",
-            properties = props,
-            required = required.Count > 0 ? required : null
-         };
+      //   var schema = new
+      //   {
+      //      type = "object",
+      //      properties = props,
+      //      required = required.Count > 0 ? required : null
+      //   };
 
-         var tool = new FunctionToolDefinition(
-             name: sanitized,
-             description: methodDesc,
-             parameters: BinaryData.FromObjectAsJson(schema,
-                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-         );
-         return tool;
-      }
+      //   var tool = new FunctionToolDefinition(
+      //       name: sanitized,
+      //       description: methodDesc,
+      //       parameters: BinaryData.FromObjectAsJson(schema,
+      //           new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+      //   );
+      //   return tool;
+      //}
    }
 }

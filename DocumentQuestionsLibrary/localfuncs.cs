@@ -44,12 +44,13 @@ namespace DocumentQuestions.Library
       private readonly PersistentAgentsClient _agentsClient;
       private readonly LocalToolsUtility localToolUtility;
 
-      public LocalFunctionTools(string projectEndpoint, LocalToolsUtility toolsUtility, Azure.Core.TokenCredential? credential = null)
+      public LocalFunctionTools(string projectEndpoint, LocalToolsUtility toolsUtility, LocalToolsLibrary toolsLibrary, Azure.Core.TokenCredential? credential = null)
       {
          credential ??= new DefaultAzureCredential();
          _projectClient = new AIProjectClient(new Uri(projectEndpoint), credential);
          _agentsClient = _projectClient.GetPersistentAgentsClient();
          this.localToolUtility = toolsUtility;
+         this.localToolUtility.RegisterLocalToolMethods(toolsLibrary.GetType(), toolsLibrary);
       }
 
 
@@ -102,7 +103,7 @@ namespace DocumentQuestions.Library
 
          // Demonstrate the reflection-based tool execution
          Console.WriteLine("Available tools:");
-         var toolDefinitions = localToolUtility.GetAllToolDefinitions();
+         var toolDefinitions = localToolUtility.GetRegisterLocalToolDefinitions();
          foreach (var tool in toolDefinitions)
          {
             Console.WriteLine($"  - {tool.Name}: {tool.Description}");
@@ -255,12 +256,12 @@ namespace DocumentQuestions.Library
       /// </summary>
       public async Task<string> QuickTestAsync(string model = "gpt-4o")
       {
-         var tools = localToolUtility.GetAllToolDefinitions().ToArray();
+         var tools = localToolUtility.GetRegisterLocalToolDefinitions().ToArray();
          // Create agent with all discovered tools (not just weather)
          var agent = await CreateAgentWithToolsAsync(
              model: model,
              name: "GenericToolAgent",
-             instructions: "You are a helpful assistant with access to various tools. Use the appropriate tools to answer user questions.",
+             instructions: "You are a helpful assistant with access to various tools. Use the appropriate tools to answer one or more user questions.",
              tools: tools
          );
 

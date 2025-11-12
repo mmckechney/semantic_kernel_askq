@@ -225,7 +225,7 @@ namespace DocumentQuestions.Console
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
-         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"], localToolsUtility);
+         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"], localToolsUtility, localToolsLibrary);
          await local.QuickTestAsync();
          return;
 

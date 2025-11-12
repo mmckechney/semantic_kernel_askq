@@ -89,7 +89,7 @@ Do not return social security numbers. If you find one, only the last four digit
          });
       }
 
-      private async Task<AIAgent> CreateFoundryAgent(string name, string deployment, string description, string instructions, FunctionToolDefinition tool)
+      private async Task<AIAgent> CreateFoundryAgent(string name, string deployment, string description, string instructions, params ToolDefinition[]  tools)
       {
 
          try
@@ -100,7 +100,7 @@ Do not return social security numbers. If you find one, only the last four digit
                 description: description,
                 instructions: instructions,
 
-                tools: [tool]);
+                tools: tools);
 
             return agent;
          }
@@ -114,21 +114,13 @@ Do not return social security numbers. If you find one, only the last four digit
       public async Task InitAgents()
       {
          var openAiChatDeploymentName = config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_DEPLOYMENT_NAME} in configuration.");
-         //var openAiChatModelName = config[Constants.OPENAI_CHAT_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_MODEL_NAME} in configuration.");
-         //var openAIEndpoint = config[Constants.OPENAI_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.OPENAI_ENDPOINT} in configuration.");
 
          askQuestionsAgent = await GetFoundryAgent("AskQuestions");
          if (askQuestionsAgent == null)
          {
-            var tool = localToolsUtility.FoundryToolFromMethod((Func<string, string, CancellationToken, IReadOnlyList<SemanticMemoryResult>>)aiSearchAdmin.SearchIndexAsync);
+            var tool = localToolsUtility.CreateToolDefinitionFromMethod(aiSearchAdmin.SearchIndexAsync);
+            askQuestionsAgent = await CreateFoundryAgent("AskQuestions", openAiChatDeploymentName, "Asks questions about the document", AskQuestionsInstructions, [tool]);
 
-            //var tool = FoundryToolFromMethod(
-            //    (Func<string, string, CancellationToken, IReadOnlyList<SemanticMemoryResult>>)
-            //    ((collectionName, query, ct) => aiSearchAdmin.SearchIndexAsync(collectionName, query, ct)));
-
-            askQuestionsAgent = await CreateFoundryAgent("AskQuestions", openAiChatDeploymentName, "Asks questions about the document", AskQuestionsInstructions, tool);
-
-            //xmlToMdAgent = await GetFoundryAgent("XmlToMdExtraction") ?? await CreateFoundryAgent("XmlToMdExtraction", openAiChatDeploymentName, "Extracts Markdown content from XML documents", XmlToMdInstructions);
          }
       }
 
