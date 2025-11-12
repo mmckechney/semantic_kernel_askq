@@ -5,12 +5,12 @@ using Azure.Identity;
 using Microsoft.Agents.AI;
 using System.ComponentModel;
 using System.ComponentModel.Design;
+using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Xml;
-using System.Reflection;
-using System.Text.RegularExpressions;
-using System.Text;
 
 namespace DocumentQuestions.Library
 {
@@ -102,114 +102,32 @@ namespace DocumentQuestions.Library
          Console.WriteLine("=== Testing Generic Tool Execution ===\n");
 
          // Demonstrate the reflection-based tool execution
-         Console.WriteLine("Available tools:");
-         var toolDefinitions = localToolUtility.GetRegisterLocalToolDefinitions();
-         foreach (var tool in toolDefinitions)
-         {
-            Console.WriteLine($"  - {tool.Name}: {tool.Description}");
-         }
-         Console.WriteLine();
+         //Console.WriteLine("Available tools:");
+         //var toolDefinitions = localToolUtility.GetRegisterLocalToolDefinitions();
+         //foreach (var tool in toolDefinitions)
+         //{
+         //   Console.WriteLine($"  - {tool.Name}: {tool.Description}");
+         //}
+         //Console.WriteLine();
 
          string agentId = string.Empty;
          PersistentAgentThread? thread = null;
+         
 
          try
          {
 
-
-            agentId = agent.Id;
-            Console.WriteLine($"✓ Created agent: {agent.Name} (ID: {agentId}) with {toolDefinitions.Count()} tools\n");
-
-            Console.WriteLine($"Question: {question}");
-            Console.WriteLine($"--- Agent Response ---");
-
-            // Create thread and run
-            thread = await _agentsClient.Threads.CreateThreadAsync();
-            Console.WriteLine($"Created thread, ID: {thread.Id}");
-
-            var messageResponse = _agentsClient.Messages.CreateMessage(threadId: thread.Id, role: MessageRole.User, content: question);
-            ThreadRun threadRun = await _agentsClient.Runs.CreateRunAsync(thread.Id, agent.Id);
-            Console.WriteLine($"ThreadRun Status: {threadRun.Status}");
-            // Process with generic tool handling
-            List<RunStatus> activeStatus = [RunStatus.Cancelled, RunStatus.Completed, RunStatus.Failed];
-            while (!activeStatus.Contains(threadRun.Status))
+            ThreadRun? currentThreadRun = null;
+            StringBuilder responseBuilder = new();
+            await foreach (var (text, threadRun) in agent.RunStreamingAsyncWithLocalTools(localToolUtility,_agentsClient,question, currentThreadRun))
             {
-               await Task.Delay(100);
-               threadRun = await _agentsClient.Runs.GetRunAsync(threadRun.ThreadId, threadRun.Id);
-               Console.WriteLine($"ThreadRun Status: {threadRun.Status}");
-               if (threadRun.Status == RunStatus.RequiresAction
-                   && threadRun.RequiredAction is SubmitToolOutputsAction submitToolOutputsAction)
-               {
-                  Console.WriteLine("Run requires action - processing function calls...");
-                  List<ToolOutput> toolOutputs = new List<ToolOutput>();
-
-                  foreach (RequiredToolCall toolCall in submitToolOutputsAction.ToolCalls)
-                  {
-                     if (toolCall is RequiredFunctionToolCall functionToolCall)
-                     {
-                        Console.WriteLine($"Processing tool call: {functionToolCall.Name}");
-                        Console.WriteLine($"Arguments: {functionToolCall.Arguments}");
-
-                        try
-                        {
-                           // Use the generic tool execution method - works for ANY discovered tool
-                           string toolResult = await localToolUtility.ExecuteToolCallAsync(functionToolCall.Name, functionToolCall.Arguments ?? "{}");
-                           toolOutputs.Add(new ToolOutput(toolCall, toolResult));
-                           Console.WriteLine($"✓ Executed {functionToolCall.Name} successfully");
-                           Console.WriteLine($"Result: {toolResult}");
-                        }
-                        catch (Exception ex)
-                        {
-                           Console.WriteLine($"❌ Error executing tool {functionToolCall.Name}: {ex.Message}");
-                           string errorResult = $"Error: {ex.Message}";
-                           toolOutputs.Add(new ToolOutput(toolCall, errorResult));
-                        }
-                     }
-                  }
-
-                  if (toolOutputs.Count > 0)
-                  {
-                     threadRun = await _agentsClient.Runs.SubmitToolOutputsToRunAsync(threadRun, toolOutputs);
-                     Console.WriteLine("Submitted tool outputs");
-                  }
-               }
-               else
-               {
-                  
-               }
-            }
-            Console.WriteLine($"Final ThreadRun Status: {threadRun.Status}");
-            // Get final response
-            Pageable<PersistentThreadMessage> messages = _agentsClient.Messages.GetMessages(
-                threadId: thread.Id,
-                order: ListSortOrder.Ascending
-            );
-
-            string? agentResponse = null;
-            foreach (PersistentThreadMessage threadMessage in messages)
-            {
-               foreach (MessageContent content in threadMessage.ContentItems)
-               {
-                  if (content is MessageTextContent textItem)
-                  {
-                     Console.WriteLine($"Role: {threadMessage.Role}, Content: {textItem.Text}");
-
-                     if (threadMessage.Role.ToString().ToLower() == "assistant")
-                     {
-                        agentResponse = textItem.Text;
-                     }
-                  }
-               }
+               Console.WriteLine(text);
+               responseBuilder.Append(text);
+               currentThreadRun = threadRun; // Update thread for next question
             }
 
-            if (!string.IsNullOrEmpty(agentResponse))
-            {
-               Console.WriteLine("\n=== AGENT OUTPUT ===");
-               Console.WriteLine(agentResponse);
-               Console.WriteLine("==================");
-            }
-
-            return agentResponse ?? "No response received";
+            return responseBuilder.ToString();
+       
          }
          catch (Exception ex)
          {

@@ -3,56 +3,87 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using System.Runtime.InteropServices;
+using System.Text;
+
 namespace DocumentQuestions.Library
 {
    public static class LocalToolsExtensions
    {
       private static ILogger log = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger("LocalToolsExtensions");
-      public static async IAsyncEnumerable<AgentRunResponseUpdate> RunStreamingAsyncWithLocalTools(this AIAgent agent, LocalToolsUtility localToolUtility, PersistentAgentsClient agentsClient, string message)
+
+      public static async IAsyncEnumerable<(string text, ThreadRun threadRun)> RunStreamingAsyncWithLocalTools(
+         this AIAgent agent,
+         LocalToolsUtility localToolUtility,
+         PersistentAgentsClient agentsClient,
+         string userMessage,
+         ThreadRun existingThreadRun = null)
       {
          var agentId = agent.Id;
-         //log.LogInformation($"✓ Created agent: {agent.Name} (ID: {agentId}) with {agent..Count()} tools\n");
+         log.LogDebug($"Message: {userMessage}");
+         log.LogDebug($"--- Agent Response (Streaming) ---");
 
-         log.LogInformation($"Message: {message}");
-         log.LogInformation($"--- Agent Response ---");
+         // Create thread and add user message
+         PersistentAgentThread thread;
+         ThreadRun currentRun;
 
-         // Create thread and run
-         PersistentAgentThread? thread = await agentsClient.Threads.CreateThreadAsync();
-         log.LogInformation($"Created thread, ID: {thread.Id}");
-
-         var messageResponse = agentsClient.Messages.CreateMessage(threadId: thread.Id, role: MessageRole.User, content: message);
-         ThreadRun threadRun = await agentsClient.Runs.CreateRunAsync(thread.Id, agent.Id);
-         log.LogInformation($"ThreadRun Status: {threadRun.Status}");
-         // Process with generic tool handling
-         List<RunStatus> activeStatus = [RunStatus.Cancelled, RunStatus.Completed, RunStatus.Failed];
-         while (!activeStatus.Contains(threadRun.Status))
+         if (existingThreadRun != null)
          {
-            await Task.Delay(100);
-            threadRun = await agentsClient.Runs.GetRunAsync(threadRun.ThreadId, threadRun.Id);
-            log.LogInformation($"ThreadRun Status: {threadRun.Status}");
-            if (threadRun.Status == RunStatus.RequiresAction && threadRun.RequiredAction is SubmitToolOutputsAction submitToolOutputsAction)
+            // Use existing thread
+            thread = agentsClient.Threads.GetThread(existingThreadRun.ThreadId).Value;
+            // existingThreadRun = await agentsClient.Runs.GetRunAsync(existingThreadRun.ThreadId, existingThreadRun.Id);
+            currentRun = existingThreadRun;
+         }
+         else
+         {
+            // Create new thread and run
+            var threadAndRun = agentsClient.CreateThreadAndRun(agent.Id, new ThreadAndRunOptions());
+            currentRun = threadAndRun.Value;
+            thread = agentsClient.Threads.GetThread(currentRun.ThreadId).Value;
+            // Add the user message to the new thread
+            agentsClient.Messages.CreateMessage(threadId: thread.Id, role: MessageRole.User, content: userMessage);
+            // Create a new run for this message
+            currentRun = await agentsClient.Runs.CreateRunAsync(thread.Id, agent.Id);
+         }
+
+         log.LogDebug($"Thread ID: {thread.Id}, Run ID: {currentRun.Id}");
+
+
+         List<RunStatus> terminalStatuses = [RunStatus.Cancelled, RunStatus.Completed, RunStatus.Failed, RunStatus.Expired];
+
+         do
+         {
+            await Task.Delay(500); // Poll interval
+            currentRun = await agentsClient.Runs.GetRunAsync(currentRun.ThreadId, currentRun.Id);
+            log.LogDebug($"Run Status: {currentRun.Status}");
+
+            // Check if we need to process tool calls
+            if (currentRun.Status == RunStatus.RequiresAction &&
+                currentRun.RequiredAction is SubmitToolOutputsAction submitToolOutputsAction)
             {
-               log.LogInformation("Run requires action - processing function calls...");
+               log.LogDebug("Run requires action - processing function calls...");
                List<ToolOutput> toolOutputs = new List<ToolOutput>();
 
                foreach (RequiredToolCall toolCall in submitToolOutputsAction.ToolCalls)
                {
                   if (toolCall is RequiredFunctionToolCall functionToolCall)
                   {
-                     log.LogInformation($"Processing tool call: {functionToolCall.Name}");
-                     log.LogInformation($"Arguments: {functionToolCall.Arguments}");
+                     log.LogDebug($"Processing tool call: {functionToolCall.Name}");
+                     log.LogDebug($"Arguments: {functionToolCall.Arguments}");
 
                      try
                      {
-                        // Use the generic tool execution method - works for ANY discovered tool
-                        string toolResult = await localToolUtility.ExecuteToolCallAsync(functionToolCall.Name, functionToolCall.Arguments ?? "{}");
+                        // Execute local tool
+                        string toolResult = await localToolUtility.ExecuteToolCallAsync(
+                           functionToolCall.Name,
+                           functionToolCall.Arguments ?? "{}");
+
                         toolOutputs.Add(new ToolOutput(toolCall, toolResult));
-                        log.LogInformation($"✓ Executed {functionToolCall.Name} successfully");
-                        log.LogInformation($"Result: {toolResult}");
+                        log.LogDebug($"✓ Executed {functionToolCall.Name} successfully");
+                        log.LogDebug($"Result: {toolResult}");
                      }
                      catch (Exception ex)
                      {
-                        log.LogInformation($"❌ Error executing tool {functionToolCall.Name}: {ex.Message}");
+                        log.LogError($"❌ Error executing tool {functionToolCall.Name}: {ex.Message}");
                         string errorResult = $"Error: {ex.Message}";
                         toolOutputs.Add(new ToolOutput(toolCall, errorResult));
                      }
@@ -61,17 +92,36 @@ namespace DocumentQuestions.Library
 
                if (toolOutputs.Count > 0)
                {
-                  threadRun = await agentsClient.Runs.SubmitToolOutputsToRunAsync(threadRun, toolOutputs);
-                  log.LogInformation("Submitted tool outputs");
+                  // Submit tool outputs and continue processing
+                  currentRun = await agentsClient.Runs.SubmitToolOutputsToRunAsync(currentRun, toolOutputs);
+                  log.LogDebug($"Submitted tool outputs, new status: {currentRun.Status}");
+                  //continueProcessing = true; // Continue the loop to process the response
                }
             }
-            else
+
+
+            // Get agent response from this loop
+            await foreach (var msg in agentsClient.Messages.GetMessagesAsync(threadId: currentRun.ThreadId, order: ListSortOrder.Descending))
             {
-
+               // Get the first assistant message (most recent)
+               //if (msg.Role == MessageRole.Agent)
+               //{
+               foreach (var content in msg.ContentItems)
+               {
+                  if (content is MessageTextContent textContent && !string.IsNullOrEmpty(textContent.Text))
+                  {
+                     // Yield the text to caller
+                     yield return (textContent.Text, currentRun);
+                  }
+               }
+               //break; // Only get the most recent assistant message
+               //}
             }
-         }
-         log.LogInformation($"Final ThreadRun Status: {threadRun.Status}");
-      }
 
+
+         } while (!terminalStatuses.Contains(currentRun.Status));
+
+         log.LogInformation($"{Environment.NewLine}Final Run Status: {currentRun.Status}");
+      }
    }
 }
