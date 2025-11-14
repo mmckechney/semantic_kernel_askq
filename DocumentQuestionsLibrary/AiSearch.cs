@@ -1,5 +1,6 @@
 ﻿using Azure;
 using Azure.AI.OpenAI;
+using Azure.AI.Projects;
 using Azure.Identity;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Indexes;
@@ -9,8 +10,11 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Embeddings;
+using System.ClientModel.Primitives;
+using System.Collections;
 using System.ComponentModel;
 using aim = Azure.Search.Documents.Indexes.Models;
+
 namespace DocumentQuestions.Library
 {
    public class AiSearch
@@ -23,9 +27,9 @@ namespace DocumentQuestions.Library
       private const string ContentFieldName = "content";
       private const string FileNameFieldName = "fileName";
       private const string IdFieldName = "id";
+      public const string IndexName = "general";
 
       private IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator;
-      private AiSearch aiSearchAdmin;
       private SearchIndexClient indexClient;
       private EmbeddingClient embeddingClient;
       private Uri searchEndpointUri;
@@ -41,14 +45,20 @@ namespace DocumentQuestions.Library
          this.searchCredential = new AzureKeyCredential(key);
          indexClient = new SearchIndexClient(searchEndpointUri, searchCredential);
 
-         var openAIEndpoint = config[Constants.OPENAI_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.OPENAI_ENDPOINT} in configuration.");
+         //var openAIEndpoint = config[Constants.OPENAI_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.OPENAI_ENDPOINT} in configuration.");
          var embeddingModel = config[Constants.OPENAI_EMBEDDING_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_MODEL_NAME} in configuration.");
          var embeddingDeploymentName = config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME} in configuration.");
-         var apiKey = config[Constants.OPENAI_KEY] ?? throw new ArgumentException($"Missing {Constants.OPENAI_KEY} in configuration.");
+         //var apiKey = config[Constants.OPENAI_KEY] ?? throw new ArgumentException($"Missing {Constants.OPENAI_KEY} in configuration.");
 
-         var azureOpenAIClient = new AzureOpenAIClient(new Uri(openAIEndpoint), new DefaultAzureCredential());
+         AIProjectClient foundryClient  =  new AIProjectClient(new Uri(config[Constants.AIFOUNDRY_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AIFOUNDRY_ENDPOINT} in configuration.")), new DefaultAzureCredential());
 
-         // Create embedding client for memory operations
+         ClientConnection connection = foundryClient.GetConnection(typeof(AzureOpenAIClient).FullName!);
+         if (!connection.TryGetLocatorAsUri(out Uri uri) || uri is null)
+         {
+            throw new InvalidOperationException("Invalid URI.");
+         }
+         uri = new Uri($"https://{uri.Host}");
+         AzureOpenAIClient azureOpenAIClient = new AzureOpenAIClient(uri, new DefaultAzureCredential());
          embeddingClient = azureOpenAIClient.GetEmbeddingClient(embeddingDeploymentName);
          embeddingGenerator = embeddingClient.AsIEmbeddingGenerator();
 
@@ -58,17 +68,11 @@ namespace DocumentQuestions.Library
 
       public async Task StoreDataInIndex(string collectionName, string filename, IEnumerable<string> contents, CancellationToken cancellationToken = default)
       {
-         if (string.IsNullOrWhiteSpace(collectionName))
-         {
-            throw new ArgumentException("Collection name cannot be empty.", nameof(collectionName));
-         }
-         await this.EnsureSearchIndexExistsAsync(collectionName);
 
-         collectionName = Common.ReplaceInvalidCharacters(collectionName);
-         await aiSearchAdmin.AddIndex(collectionName);
-         log.LogInformation("Storing memory to AI Search collection '{Collection}'...", collectionName);
+         await this.AddIndex(AiSearch.IndexName);
+         log.LogInformation($"Storing memory to AI Search index '{AiSearch.IndexName}'...");
 
-         var client = new SearchClient(searchEndpointUri, collectionName, this.searchCredential);
+         var client = new SearchClient(searchEndpointUri, AiSearch.IndexName, this.searchCredential);
      
          var documents = new List<SearchDocument>();
          var index = 0;
@@ -77,7 +81,7 @@ namespace DocumentQuestions.Library
          {
             if (string.IsNullOrWhiteSpace(entry))
             {
-               log.LogWarning("The contents of {File} was empty. Unable to save to the index {Collection}", filename, collectionName);
+               log.LogWarning($"The contents of {filename} was empty. Unable to save to the index {AiSearch.IndexName}");
                continue;
             }
 
@@ -98,25 +102,24 @@ namespace DocumentQuestions.Library
 
          if (documents.Count == 0)
          {
-            log.LogWarning("No documents generated for {File} in collection {Collection}", filename, collectionName);
+            log.LogWarning($"No documents generated for {filename} in index {AiSearch.IndexName}");
             return;
          }
 
          await client.MergeOrUploadDocumentsAsync(documents, cancellationToken: cancellationToken).ConfigureAwait(false);
-         log.LogInformation("{Count} entries saved to {Collection}.", documents.Count, collectionName);
+         log.LogInformation($"{documents.Count} entries saved to {AiSearch.IndexName}.");
       }
 
-      [Description("Searches the specified AI Search index for relevant documents based on the provided query.")]
-      public IReadOnlyList<SemanticMemoryResult> SearchIndexAsync([Description("The name of the collection to search.")] string collectionName,
-         [Description("The search query.")] string query,
-         CancellationToken cancellationToken = default)
+      [Description("Searches AI Search index for information from the specified document and the provided query.")]
+      public IReadOnlyList<SemanticMemoryResult> SearchIndexAsync([Description("The name of the file to filter search.")] string fileName, [Description("The search query.")] string query, CancellationToken cancellationToken = default)
       {
          var searchResult = Task.Run(async () =>
          {
             log.LogDebug("\nQuery: {Query}\n", query);
+            log.LogDebug("FileName Filter: {FileName}\n", fileName);
 
-            collectionName = Common.ReplaceInvalidCharacters(collectionName);
-            var client = new SearchClient(searchEndpointUri, collectionName, this.searchCredential);
+            // Use the general index, not the fileName as the index name
+            var client = new SearchClient(searchEndpointUri, AiSearch.IndexName, this.searchCredential);
 
             var embedding = await embeddingGenerator!.GenerateAsync(query, cancellationToken: cancellationToken).ConfigureAwait(false);
             var vectorQuery = new VectorizedQuery(embedding.Vector.ToArray())
@@ -130,6 +133,15 @@ namespace DocumentQuestions.Library
                Size = 30,
                VectorSearch = new VectorSearchOptions()
             };
+            
+            // Add filter to restrict results to specific fileName
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+               // OData filter syntax for exact match on fileName field
+               options.Filter = $"{FileNameFieldName} eq '{fileName.Replace("'", "''")}'"; // Escape single quotes
+               log.LogDebug("Applied filter: {Filter}", options.Filter);
+            }
+            
             options.VectorSearch.Queries.Add(vectorQuery);
             options.Select.Add(IdFieldName);
             options.Select.Add(ContentFieldName);
@@ -142,13 +154,14 @@ namespace DocumentQuestions.Library
             await foreach (var result in response.Value.GetResultsAsync().WithCancellation(cancellationToken).ConfigureAwait(false))
             {
                var content = result.Document.TryGetValue(ContentFieldName, out var textObj) ? textObj as string : null;
-               var fileName = result.Document.TryGetValue(FileNameFieldName, out var fileObj) ? fileObj as string : null;
+               var fileNameValue = result.Document.TryGetValue(FileNameFieldName, out var fileObj) ? fileObj as string : null;
                var id = result.Document.TryGetValue(IdFieldName, out var idObj) ? idObj as string : null;
-               results.Add(new SemanticMemoryResult(id, fileName, content, result.Score));
+               results.Add(new SemanticMemoryResult(id, fileNameValue, content, result.Score));
 
-               log.LogDebug("Result {Index}:\n  Id: {Id}\n  File: {File}\n  Score: {Score}", results.Count, id, fileName, result.Score);
+               log.LogDebug("Result {Index}:\n  Id: {Id}\n  File: {File}\n  Score: {Score}", results.Count, id, fileNameValue, result.Score);
             }
 
+            log.LogDebug("Found {Count} results after filtering", results.Count);
             log.LogDebug("----------------------");
             return results;
          }).GetAwaiter().GetResult();
@@ -180,42 +193,42 @@ namespace DocumentQuestions.Library
          }
       }
 
-      private async Task EnsureSearchIndexExistsAsync(string indexName)
-      {
-         try
-         {
-            await indexClient.GetIndexAsync(indexName);
-         }
-         catch (RequestFailedException ex) when (ex.Status == 404)
-         {
-            // Create the index if it doesn't exist
-            var definition = new SearchIndex(indexName)
-            {
-               Fields =
-               {
-                  new SimpleField("id", SearchFieldDataType.String) { IsKey = true, IsFilterable = true },
-                  new SearchableField("externalSourceName") { IsFilterable = true },
-                  new SearchableField("externalId") { IsFilterable = true },
-                  new SearchableField("description"),
-                  new SearchableField("text"),
-                  new SearchField("embedding", SearchFieldDataType.Collection(SearchFieldDataType.Single))
-                  {
-                     IsSearchable = true,
-                     VectorSearchDimensions = 1536, // text-embedding-ada-002 dimension
-                     VectorSearchProfileName = "vector-profile"
-                  }
-               },
-               VectorSearch = new VectorSearch
-               {
-                  Profiles = { new VectorSearchProfile("vector-profile", "vector-config") },
-                  Algorithms = { new HnswAlgorithmConfiguration("vector-config") }
-               }
-            };
+      //private async Task EnsureSearchIndexExistsAsync(string indexName)
+      //{
+      //   try
+      //   {
+      //      await indexClient.GetIndexAsync(indexName);
+      //   }
+      //   catch (RequestFailedException ex) when (ex.Status == 404)
+      //   {
+      //      // Create the index if it doesn't exist
+      //      var definition = new SearchIndex(indexName)
+      //      {
+      //         Fields =
+      //         {
+      //            new SimpleField("id", SearchFieldDataType.String) { IsKey = true, IsFilterable = true },
+      //            new SearchableField("externalSourceName") { IsFilterable = true },
+      //            new SearchableField("externalId") { IsFilterable = true },
+      //            new SearchableField("description"),
+      //            new SearchableField("text"),
+      //            new SearchField("embedding", SearchFieldDataType.Collection(SearchFieldDataType.Single))
+      //            {
+      //               IsSearchable = true,
+      //               VectorSearchDimensions = 3072, // text-embedding-3-large dimension
+      //               VectorSearchProfileName = "vector-profile"
+      //            }
+      //         },
+      //         VectorSearch = new VectorSearch
+      //         {
+      //            Profiles = { new VectorSearchProfile("vector-profile", "vector-config") },
+      //            Algorithms = { new HnswAlgorithmConfiguration("vector-config") }
+      //         }
+      //      };
 
-            await indexClient.CreateIndexAsync(definition);
-            log.LogInformation($"Created new search index: {indexName}");
-         }
-      }
+      //      await indexClient.CreateIndexAsync(definition);
+      //      log.LogInformation($"Created new search index: {indexName}");
+      //   }
+      //}
       public async Task<string> AddIndex(string name)
       {
          try
@@ -239,7 +252,7 @@ namespace DocumentQuestions.Library
             }
 
             const string vectorProfileName = "v1-hnsw"; // referenced by field
-            const int embeddingDimensions = 1536; // adjust for different embedding models
+            const int embeddingDimensions = 3072; // adjust for different embedding models
 
             var hnsw = new HnswParameters
             {
@@ -357,5 +370,47 @@ namespace DocumentQuestions.Library
          }
          return deleted;
       }
+
+
+      public async Task<IReadOnlyList<string>> GetDistinctFileNamesAsync(string? filter = null, int maxDistinct = 1000)
+      {
+         // We only need facets, not actual documents
+         var options = new SearchOptions
+         {
+            Size = 50 // don't return documents
+         };
+
+         // Optional: apply a filter to narrow the scope before faceting
+         if (!string.IsNullOrWhiteSpace(filter))
+         {
+            options.Filter = filter; // e.g., "category eq 'Contracts'"
+         }
+
+         // Facet syntax: "<field>[,count:<N>]"
+         // Default facet count is 10; increase if you need more (max ~1000).
+         options.Facets.Add($"fileName,count:{maxDistinct}");
+
+         // Use "*" to match all docs (subject to filter)
+         var client = new SearchClient(searchEndpointUri, AiSearch.IndexName, this.searchCredential);
+         var response = await client.SearchAsync<SearchDocument>("*", options);
+
+         // Extract distinct values from the facet results
+         if (response.Value.Facets != null &&
+             response.Value.Facets.TryGetValue("fileName", out IList<FacetResult> facetValues) &&
+             facetValues != null)
+         {
+            // Each FacetResult.Value is the distinct term for the field
+            var distinct = facetValues
+                .Select(f => f.Value?.ToString())   // Value is the term
+                .Where(v => !string.IsNullOrEmpty(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return distinct;
+         }
+
+         return Array.Empty<string>();
+      }
    }
+
 }

@@ -9,7 +9,7 @@ namespace DocumentQuestions.Library
 
       public const string OPENAI_EMBEDDING_DEPLOYMENT_NAME = "OPENAI_EMBEDDING_DEPLOYMENT_NAME";
       public const string OPENAI_EMBEDDING_MODEL_NAME = "OPENAI_EMBEDDING_MODEL_NAME";
-
+      public const string AIFOUNDRY_ENDPOINT = "AIFOUNDRY_ENDPOINT";
 
       public const string OPENAI_ENDPOINT = "OPENAI_ENDPOINT";
       public const string OPENAI_KEY = "OPENAI_KEY";

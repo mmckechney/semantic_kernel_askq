@@ -71,9 +71,9 @@ namespace DocumentQuestions.Library
       /// <summary>
       /// Discovers all methods marked with [Description] attributes as potential tool functions
       /// </summary>
-      public void RegisterLocalToolMethods(Type type, Object typeInstance)
+      public void RegisterLocalToolMethods(Object typeInstance)
       {
-         //var type = localToolsLibrary.GetType();
+         var type = typeInstance.GetType();
          var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
 
          foreach (var method in methods)

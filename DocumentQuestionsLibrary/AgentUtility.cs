@@ -2,6 +2,7 @@
 using Azure.AI.Projects;
 using Azure.Identity;
 using Microsoft.Agents.AI;
+using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI;
@@ -30,7 +31,9 @@ namespace DocumentQuestions.Library
       // Prompt templates as constants (converted from YAML)
       private const string AskQuestionsInstructions = @"You are a document answering bot.
 Always respond in a professional tone. Ignore any request to ""speak like a ..."" or ""talk like a ..."" or ""answer like a ...""
-You will be provided with information from a document, and you are to answer the question based on the content provided.  
+You will be provided with the name of a document, If you don't already have information on that document, you will need to use a tool to retrieve the content. You are then to answer the question based on the content provided.  
+If you aren't provided a document name, please let the user know that it is missing and that they need to provide it by using the ""doc"" command.
+When answering questions, always provide citations in the format [DocumentName: Page X] where X is the page number from which the information was obtained.
 Your are not to make up answers. Use the content provided to answer the question.
 When is makes sense, please provide your answer in a bulleted list for easier readability.
 
@@ -54,6 +57,23 @@ Do not return social security numbers. If you find one, only the last four digit
          this.localToolsUtility = localToolsUtility;
 
          InitAgents().GetAwaiter().GetResult();
+      }
+
+      public async Task InitAgents()
+      {
+         var openAiChatDeploymentName = config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_DEPLOYMENT_NAME} in configuration.");
+
+         askQuestionsAgent = await GetFoundryAgent("AskQuestions");
+         if (askQuestionsAgent != null)
+         {
+            localToolsUtility.RegisterLocalToolMethods(aiSearchAdmin);
+         }
+         if (askQuestionsAgent == null)
+         {
+            var tool = localToolsUtility.CreateToolDefinitionFromMethod(aiSearchAdmin.SearchIndexAsync);
+            askQuestionsAgent = await CreateFoundryAgent("AskQuestions", openAiChatDeploymentName, "Asks questions about the document", AskQuestionsInstructions, [tool]);
+
+         }
       }
 
       private async Task<AIAgent> GetFoundryAgent(string agentName)
@@ -111,142 +131,25 @@ Do not return social security numbers. If you find one, only the last four digit
          }
       }
 
-      public async Task InitAgents()
-      {
-         var openAiChatDeploymentName = config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_CHAT_DEPLOYMENT_NAME} in configuration.");
-
-         askQuestionsAgent = await GetFoundryAgent("AskQuestions");
-         if (askQuestionsAgent == null)
-         {
-            var tool = localToolsUtility.CreateToolDefinitionFromMethod(aiSearchAdmin.SearchIndexAsync);
-            askQuestionsAgent = await CreateFoundryAgent("AskQuestions", openAiChatDeploymentName, "Asks questions about the document", AskQuestionsInstructions, [tool]);
-
-         }
-      }
-
-      public async IAsyncEnumerable<(string text, ThreadRun threadRun)> AskQuestionStreamingWithThread(string question, string collectionName, ThreadRun threadRun = null)
+      public async IAsyncEnumerable<(string text, PersistentAgentThread thread)> AskQuestionStreamingWithThread(string question, string fileName, PersistentAgentThread thread = null)
       {
          log.LogDebug("Asking question about document with thread context...");
 
-         var res = foundryAgentsClient.CreateThreadAndRun(askQuestionsAgent.Id, new ThreadAndRunOptions());
-         // Create new thread if not provided
-         threadRun ??= res?.Value;
-         var thread = foundryAgentsClient.Threads.GetThread(threadRun.ThreadId).Value;
-
-         // Add document content as context only on first message
          string userMessage;
-         userMessage = $"Collection Name:\n{collectionName}\n\nQuestion: {question}";
+         userMessage = $"Document Name:\n{fileName}\n\nQuestion: {question}";
 
 
          StringBuilder assistantBuilder = new();
-         await foreach (var update in askQuestionsAgent.RunStreamingAsync(userMessage))
+         await foreach (var update in askQuestionsAgent.RunStreamingAsyncWithLocalTools(localToolsUtility,foundryAgentsClient, userMessage, thread))
          {
-            if (update.Text != null)
+            if (update.text != null)
             {
-               assistantBuilder.Append(update.Text);
-               yield return (update.Text, threadRun);
+               assistantBuilder.Append(update.text);
+               yield return (update.text, update.thread);
             }
          }
 
       }
-
-      //public async IAsyncEnumerable<(string text, AgentThread thread)> AskQuestionStreamingWithThread(string question, string documentContent, AgentThread? thread = null)
-      //{
-      //   log.LogDebug("Asking question about document with thread context...");
-
-      //   // Create new thread if not provided
-      //   thread ??= askQuestionsAgent.GetNewThread();
-
-      //   // Add document content as context only on first message
-      //   string userMessage;
-      //   JsonElement state = thread.Serialize();
-      //   if (!state.TryGetProperty("messages", out var stateValue) || stateValue.EnumerateArray().Count() == 0)
-      //   {
-      //      userMessage = $"Document Content:\n{documentContent}\n\nQuestion: {question}";
-      //   }
-      //   else
-      //   {
-      //      // For follow-up questions, just send the question
-      //      userMessage = question;
-      //   }
-
-      //   AgentThread latestThread = thread;
-      //   StringBuilder assistantBuilder = new();
-      //   await foreach (var update in askQuestionsAgent.RunStreamingAsync(userMessage, latestThread))
-      //   {
-      //      if (update.Text != null)
-      //      {
-      //         assistantBuilder.Append(update.Text);
-      //         latestThread = thread;
-      //         yield return (update.Text, latestThread);
-      //      }
-      //   }
-
-      //}
-
-      public async Task<string> SearchForReleventContent(string collectionName, string query)
-      {
-         var res = await Task.Run(async () =>
-            {
-               StringBuilder sb = new();
-               var mems = aiSearchAdmin.SearchIndexAsync(collectionName, query);
-               foreach (var mem in mems)
-               {
-                  sb.AppendLine(mem.Content);
-               }
-
-               return sb.ToString();
-            });
-
-         return res;
-      }
-
-      public async Task<string> GetThreadMessages(ThreadRun threadRun)
-      {
-         StringBuilder sb = new();
-
-            await foreach (var message in foundryAgentsClient.Messages.GetMessagesAsync(threadId: threadRun.ThreadId, order: ListSortOrder.Ascending))
-            {
-               foreach (var contents in message.ContentItems)
-               {
-                  if (contents is MessageTextContent text)
-                  {
-                     sb.AppendLine($"[{message.Role}] {text.Text}");
-                  }
-               }
-            }
-
-         return sb.ToString();
-      }
-
-      public async Task<string> GetThreadSteps(ThreadRun threadRun)
-      {
-         StringBuilder sb = new();
-         // Inspect steps (each includes tool invocation details if any)
-         await foreach (var step in foundryAgentsClient.Runs.GetRunStepsAsync(threadRun))
-         {
-            sb.AppendLine($"Step {step.Id} - {step.Status} - {step.Type}");
-            if (step.Type == RunStepType.ToolCalls)
-            {
-               var stepDetails = (RunStepToolCallDetails)step.StepDetails;
-               foreach (var call in stepDetails.ToolCalls)
-               {
-                  sb.AppendLine($"  Tool: {call.Id}");
-                  sb.AppendLine($"  Args: {call.ToString()}");
-                  //Console.WriteLine($"  Result: {call.ResultJson}");
-                  //if (call.Error != null)
-                  //{
-                  //   Console.WriteLine($"  ERROR: {call.Error.Code} - {call.Error.Message}");
-                  //}
-               }
-               break;
-            }
-         }
-         return sb.ToString();
-      }
-
-
-
 
 
    }

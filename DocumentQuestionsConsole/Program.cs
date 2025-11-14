@@ -70,6 +70,30 @@ namespace DocumentQuestions.Console
          }
 
          var builder = new HostBuilder()
+             .ConfigureLogging(logging =>
+             {
+                logging.SetMinimumLevel(level);
+                //logging.AddFilter("System", LogLevel.Warning);
+                //logging.AddFilter("Microsoft", LogLevel.Warning);
+                if (!string.IsNullOrWhiteSpace(connectionString))
+                {
+                   logging.AddOpenTelemetry(options =>
+                   {
+                      options.SetResourceBuilder(resourceBuilder);
+                      options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
+                      // Format log messages. This is default to false.
+                      options.IncludeFormattedMessage = true;
+                      options.IncludeScopes = true;
+                   });
+                }
+
+                logging.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
+                logging.AddConsole(options =>
+                {
+                   options.FormatterName = "custom";
+
+                });
+             })
             .ConfigureServices((hostContext, services) =>
             {
                services.AddSingleton<StartArgs>(new StartArgs(args));
@@ -90,30 +114,7 @@ namespace DocumentQuestions.Console
                services.AddHostedService<Worker>();
                services.AddSingleton<ConsoleFormatter, CustomConsoleFormatter>();
             })
-             .ConfigureLogging(logging =>
-             {
-                logging.SetMinimumLevel(level);
-                logging.AddFilter("System", LogLevel.Warning);
-                logging.AddFilter("Microsoft", LogLevel.Warning);
-                if (!string.IsNullOrWhiteSpace(connectionString))
-                {
-                   logging.AddOpenTelemetry(options =>
-                  {
-                     options.SetResourceBuilder(resourceBuilder);
-                     options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
-                     // Format log messages. This is default to false.
-                     options.IncludeFormattedMessage = true;
-                     options.IncludeScopes = true;
-                  });
-                }
-
-                logging.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
-                logging.AddConsole(options =>
-                {
-                   options.FormatterName = "custom";
-
-                });
-             })
+            
              
              .ConfigureAppConfiguration((hostContext, appConfiguration) =>
              {

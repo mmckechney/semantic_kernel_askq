@@ -14,30 +14,7 @@ using System.Xml;
 
 namespace DocumentQuestions.Library
 {
-   /// <summary>
-   /// Utility class demonstrating local function tool usage with Persistent Agents.
-   /// 
-   /// Usage Example:
-   /// <code>
-   /// // Set up environment
-   /// Environment.SetEnvironmentVariable("AIFOUNDRY_ENDPOINT", "https://your-project.region.models.ai.azure.com");
-   /// 
-   /// // Create the tools helper
-   /// var tools = new LocalFunctionTools(
-   ///     projectEndpoint: Environment.GetEnvironmentVariable("AIFOUNDRY_ENDPOINT")!
-   /// );
-   /// 
-   /// // Run a quick test
-   /// var response = await tools.QuickTestAsync("gpt-4o-mini");
-   /// Console.WriteLine($"Response: {response}");
-   /// 
-   /// // Or test with a custom question
-   /// var customResponse = await tools.TestWeatherAgentAsync(
-   ///     model: "gpt-4o-mini",
-   ///     question: "What's the weather in New York in metric units?"
-   /// );
-   /// </code>
-   /// </summary>
+
    public class LocalFunctionTools
    {
       private readonly AIProjectClient _projectClient;
@@ -50,14 +27,15 @@ namespace DocumentQuestions.Library
          _projectClient = new AIProjectClient(new Uri(projectEndpoint), credential);
          _agentsClient = _projectClient.GetPersistentAgentsClient();
          this.localToolUtility = toolsUtility;
-         this.localToolUtility.RegisterLocalToolMethods(toolsLibrary.GetType(), toolsLibrary);
+         this.localToolUtility.RegisterLocalToolMethods(toolsLibrary);
+
       }
 
 
       /// <summary>
       /// Creates an agent with function calling capabilities
       /// </summary>
-      public async Task<AIAgent> CreateAgentWithToolsAsync(string model, string name, string instructions, params FunctionToolDefinition[] tools)
+      public async Task<AIAgent> CreateAgentWithToolsAsync(string model, string name, string instructions, params ToolDefinition[] tools)
       {
          var agent = await _agentsClient.CreateAIAgentAsync(
              model: model,
@@ -68,7 +46,6 @@ namespace DocumentQuestions.Library
 
          return agent;
       }
-
 
       /// <summary>
       /// Deletes a thread
@@ -87,94 +64,13 @@ namespace DocumentQuestions.Library
       }
 
       /// <summary>
-      /// Example test method demonstrating the ProcessToolCall method.
-      /// This simulates how tool calls would be processed manually by parsing arguments
-      /// and executing the local tool function. Note: The Persistent Agents API handles
-      /// tool execution automatically, so this demonstrates the ProcessToolCall utility method.
-      /// </summary>
-      /// <param name="model">The AI model to use (e.g., "gpt-4o")</param>
-      /// <param name="question">The question to ask the agent</param>
-      /// <returns>The agent's response as a string</returns>
-      public async Task<string> TestAgentWithManualToolHandlingAsync(AIAgent agent, string question)
-      {
-         Console.WriteLine();
-         Console.WriteLine();
-         Console.WriteLine("=== Testing Generic Tool Execution ===\n");
-
-         // Demonstrate the reflection-based tool execution
-         //Console.WriteLine("Available tools:");
-         //var toolDefinitions = localToolUtility.GetRegisterLocalToolDefinitions();
-         //foreach (var tool in toolDefinitions)
-         //{
-         //   Console.WriteLine($"  - {tool.Name}: {tool.Description}");
-         //}
-         //Console.WriteLine();
-
-         string agentId = string.Empty;
-         PersistentAgentThread? thread = null;
-         
-
-         try
-         {
-
-            ThreadRun? currentThreadRun = null;
-            StringBuilder responseBuilder = new();
-            await foreach (var (text, threadRun) in agent.RunStreamingAsyncWithLocalTools(localToolUtility,_agentsClient,question, currentThreadRun))
-            {
-               Console.WriteLine(text);
-               responseBuilder.Append(text);
-               currentThreadRun = threadRun; // Update thread for next question
-            }
-
-            return responseBuilder.ToString();
-       
-         }
-         catch (Exception ex)
-         {
-            Console.WriteLine($"❌ Error: {ex}");
-            return $"Error: {ex.Message}";
-         }
-         finally
-         {
-            //// Cleanup
-            //if (!string.IsNullOrEmpty(agentId))
-            //{
-            //   try
-            //   {
-            //      await DeleteAgentAsync(agentId);
-            //      Console.WriteLine($"\n✓ Deleted agent: {agentId}");
-            //   }
-            //   catch (Exception ex)
-            //   {
-            //      Console.WriteLine($"Warning: Failed to delete agent: {ex.Message}");
-            //   }
-            //}
-
-            //if (thread != null)
-            //{
-            //   try
-            //   {
-            //      await DeleteThreadAsync(thread.Id);
-            //      Console.WriteLine($"✓ Deleted thread: {thread.Id}");
-            //   }
-            //   catch (Exception ex)
-            //   {
-            //      Console.WriteLine($"Warning: Failed to delete thread: {ex.Message}");
-            //   }
-            //}
-         }
-      }
-
-
-
-
-      /// <summary>
       /// Simplified test method that demonstrates manual tool call handling.
       /// This uses the ProcessToolCall method to handle tools locally.
       /// </summary>
-      public async Task<string> QuickTestAsync(string model = "gpt-4o")
+      public async Task QuickTestAsync(string model = "gpt-4o")
       {
          var tools = localToolUtility.GetRegisterLocalToolDefinitions().ToArray();
+
          // Create agent with all discovered tools (not just weather)
          var agent = await CreateAgentWithToolsAsync(
              model: model,
@@ -183,28 +79,46 @@ namespace DocumentQuestions.Library
              tools: tools
          );
 
-         StringBuilder sb = new();
-         sb.AppendLine(await TestAgentWithManualToolHandlingAsync(
-             agent: agent,
-             question: "What's the weather like in Seattle?"
-         ));
 
-         sb.AppendLine(await TestAgentWithManualToolHandlingAsync(
-           agent: agent,
-           question: "What is 145 * 2?"
-         ));
+         PersistentAgentThread? activeThread = null;
+         StringBuilder responseBuilder = new();
+         var question = "What's the weather like in Seattle?";
+         Console.WriteLine($"============={Environment.NewLine}");
+         await foreach (var (text, thread) in agent.RunStreamingAsyncWithLocalTools(localToolUtility, _agentsClient, question, activeThread))
+         {
+            Console.WriteLine(text);
+            activeThread = thread; // Update thread for next question
+         }
+         Console.WriteLine($"============={Environment.NewLine}");
 
-         sb.AppendLine(await TestAgentWithManualToolHandlingAsync(
-           agent: agent,
-           question: "What time is it?"
-         ));
+         question = "What is 145 * 2?";
+         Console.WriteLine($"============={Environment.NewLine}");
+         await foreach (var (text, thread) in agent.RunStreamingAsyncWithLocalTools(localToolUtility, _agentsClient, question, activeThread))
+         {
+            Console.WriteLine(text);
+            activeThread = thread; // Update thread for next question
+         }
+         Console.WriteLine($"============={Environment.NewLine}");
 
-         sb.AppendLine(await TestAgentWithManualToolHandlingAsync(
-            agent: agent,
-            question: "Can you tell me what's the weather in Seattle? Also, what is 15 + 27?"
-         ));
+         question = "What time is it?";
+         Console.WriteLine($"============={Environment.NewLine}");
+         await foreach (var (text, thread) in agent.RunStreamingAsyncWithLocalTools(localToolUtility, _agentsClient, question, activeThread))
+         {
+            Console.WriteLine(text);
+            activeThread = thread; // Update thread for next question
+         }
+         Console.WriteLine($"============={Environment.NewLine}");
 
-         return sb.ToString();
+         question = "Can you tell me what's the weather in Seattle? Also, what is 15 + 27?";
+         Console.WriteLine($"============={Environment.NewLine}");
+         await foreach (var (text, thread) in agent.RunStreamingAsyncWithLocalTools(localToolUtility, _agentsClient, question, activeThread))
+         {
+            Console.WriteLine(text);
+            activeThread = thread; // Update thread for next question
+         }
+         Console.WriteLine($"============={Environment.NewLine}");
+
+         await DeleteAgentAsync(agent.Id);
       }
    }
 }

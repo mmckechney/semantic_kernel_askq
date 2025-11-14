@@ -25,7 +25,7 @@ namespace DocumentQuestions.Console
       private static DocumentIntelligence documentIntelligence;
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
-      private static ThreadRun? currentThreadRun = null; // Thread for multi-turn conversations
+      private static PersistentAgentThread? currentThread = null; // Thread for multi-turn conversations
       private static LocalToolsUtility localToolsUtility;
       private static LocalToolsLibrary localToolsLibrary;
 
@@ -52,11 +52,11 @@ namespace DocumentQuestions.Console
          {
             return;
          }
-         if (string.IsNullOrWhiteSpace(activeDocument))
-         {
-            //log.LogInformation("Please use the 'doc' command to set an active document to start asking questions.", ConsoleColor.Yellow);
-            return;
-         }
+         //if (string.IsNullOrWhiteSpace(activeDocument))
+         //{
+         //   //log.LogInformation("Please use the 'doc' command to set an active document to start asking questions.", ConsoleColor.Yellow);
+         //   return;
+         //}
          string quest = string.Join(" ", question);
          syS.Console.WriteLine("----------------------");
          //var docContent = await agentUtility.SearchForReleventContent(activeDocument, quest);
@@ -68,16 +68,16 @@ namespace DocumentQuestions.Console
          //{
             // Use thread-based conversation for follow-up questions
             StringBuilder responseBuilder = new();
-            await foreach (var (text,thread) in agentUtility.AskQuestionStreamingWithThread (quest, activeDocument, currentThreadRun))
+            await foreach (var (text,thread) in agentUtility.AskQuestionStreamingWithThread (quest, activeDocument, currentThread))
             {
                syS.Console.Write(text);
                responseBuilder.Append(text);
-               currentThreadRun = thread; // Update thread for next question
+               currentThread = thread; // Update thread for next question
             }
             
-            var messages = await agentUtility.GetThreadMessages(currentThreadRun);
-            syS.Console.WriteLine();
-            log.LogInformation($"{messages}", ConsoleColor.DarkGray);
+            //var messages = await agentUtility.GetThreadMessages(currentThread);
+            //syS.Console.WriteLine();
+            //log.LogInformation($"{messages}", ConsoleColor.DarkGray);
             // Display turn count
             //int turnCount = currentThread.Serialize().GetProperty("messages").GetArrayLength();
             //if (turnCount > 2)
@@ -87,10 +87,10 @@ namespace DocumentQuestions.Console
             //}
          //}
 
-         syS.Console.WriteLine();
-         var steps = await agentUtility.GetThreadSteps(currentThreadRun);
-         syS.Console.WriteLine(steps);
-         syS.Console.WriteLine();
+         //syS.Console.WriteLine();
+         //var steps = await agentUtility.GetThreadSteps(currentThread);
+         //syS.Console.WriteLine(steps);
+         //syS.Console.WriteLine();
          //syS.Console.WriteLine("PLEASE NOTE: This does not constitue legal advice or counsel.");
          syS.Console.WriteLine("----------------------");
          syS.Console.WriteLine();
@@ -98,7 +98,7 @@ namespace DocumentQuestions.Console
 
       internal static Task ResetConversation()
       {
-         currentThreadRun = null;
+         currentThread = null;
          log.LogInformation("Conversation thread reset. Starting fresh conversation.", ConsoleColor.Green);
          return Task.CompletedTask;
       }
@@ -183,16 +183,17 @@ namespace DocumentQuestions.Console
 
       internal async static Task<int> ListFiles(object t)
       {
-         var names = await aiSearch.ListAvailableIndexes();
-         if (names.Count > 0)
+         var fileNames = await aiSearch.GetDistinctFileNamesAsync();
+         //var names = await aiSearch.ListAvailableIndexes();
+         if (fileNames.Count > 0)
          {
             log.LogInformation("List of available documents:", ConsoleColor.Yellow);
          }
-         foreach (var name in names)
+         foreach (var name in fileNames)
          {
             log.LogInformation(name);
          }
-         return names.Count;
+         return fileNames.Count;
       }
 
       internal static async Task ProcessFile(string file, string model, string index)
@@ -225,9 +226,6 @@ namespace DocumentQuestions.Console
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
-         var local = new LocalFunctionTools(config["AIFOUNDRY_ENDPOINT"], localToolsUtility, localToolsLibrary);
-         await local.QuickTestAsync();
-         return;
 
          Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
          rootParser = CommandBuilder.BuildCommandLine();
@@ -238,8 +236,6 @@ namespace DocumentQuestions.Console
          int fileCount = 0;
          StringBuilder sb;
 
-
-         return;
          while (true)
          {
             sb = new StringBuilder();

@@ -97,93 +97,23 @@ namespace DocumentQuestions.Library
          if (result != null)
          {
             string content = result.Content;
-            var contentLines = content.Split(Environment.NewLine).ToList();
+            var contentLines = content.Split("\n").ToList();
            
 
             log.LogInformation($"Writing document Markdown to bloc...");
             await common.WriteAnalysisContentToBlob(indexName,result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
-            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, 8191);
+            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, 7000);
             var taskList = new List<Task>();
 
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
-            taskList.Add(aiSearch.StoreDataInIndex(indexName, Common.BaseFileName(filePathOrUrl), chunked));
-            taskList.Add(aiSearch.StoreDataInIndex("general", Common.BaseFileName(filePathOrUrl), chunked));
+            //taskList.Add(aiSearch.StoreDataInIndex(indexName, Common.BaseFileName(filePathOrUrl), chunked));
+            taskList.Add(aiSearch.StoreDataInIndex(AiSearch.IndexName, Common.BaseFileName(filePathOrUrl), chunked));
             Task.WaitAll(taskList.ToArray());
          }
          log.LogInformation("Document Processed and Indexed");
 
       }
-   
-      //private Dictionary<string, string> SplitDocumentIntoPagesAndParagraphs(AnalyzeResult result, string fileName)
-      //{
-      //   var content = "";
-      //   bool contentFound = false;
-      //   var taskList = new List<Task>();
-      //   var docContent = new Dictionary<string, string>();
 
-      //   //Split by page if there is content...
-      //   log.LogInformation("Checking document data...");
-      //   foreach (DocumentPage page in result.Pages)
-      //   {
-
-      //      for (int i = 0; i < page.Lines.Count; i++)
-      //      {
-      //         DocumentLine line = page.Lines[i];
-      //         log.LogDebug($"  Line {i} has content: '{line.Content}'.");
-      //         content += line.Content.ToString();
-      //         contentFound = true;
-      //      }
-
-      //      if (!string.IsNullOrEmpty(content))
-      //      {
-      //         log.LogDebug("content = " + content);
-      //         taskList.Add(common.WriteAnalysisContentToBlob(fileName, page.PageNumber, content, log));
-      //         docContent.Add(GetFileName(fileName, page.PageNumber), content);
-      //      }
-      //      content = "";
-      //   }
-
-      //   //Otherwise, split by collected paragraphs
-      //   content = "";
-      //   if (!contentFound && result.Paragraphs != null)
-      //   {
-      //      var counter = 0;
-      //      foreach (DocumentParagraph paragraph in result.Paragraphs)
-      //      {
-
-      //         if (paragraph != null && !string.IsNullOrWhiteSpace(paragraph.Content))
-      //         {
-      //            if (content.Length + paragraph.Content.Length < 4000)
-      //            {
-      //               content += paragraph.Content + Environment.NewLine;
-      //            }
-      //            else
-      //            {
-      //               taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
-      //               docContent.Add(GetFileName(fileName, counter), content);
-      //               counter++;
-
-      //               content = paragraph.Content + Environment.NewLine;
-      //            }
-      //         }
-
-      //      }
-
-      //      //Add the last paragraph
-      //      taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
-      //      docContent.Add(GetFileName(fileName, counter), content);
-      //   }
-
-      //   return docContent;
-      //}
-
-      private string GetFileName(string name, int counter)
-      {
-         string nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
-         string newName = nameWithoutExtension.Replace(".", "_");
-         newName += $"_{counter.ToString().PadLeft(4, '0')}.json";
-         return newName;
-      }
    }
 }
