@@ -89,6 +89,7 @@ module roleAssignments 'roleassignments.bicep' = {
   
         cogSvcsPrincipalId: docIntelligence.outputs.docIntelPrincipalId
         currentUserObjectId : currentUserObjectId
+        aiFoundryPrincipalId: aiFoundry.outputs.docIntelPrincipalId
 
     }
     dependsOn: [
@@ -110,4 +111,9 @@ output docIntelEndpoint string = docIntelligence.outputs.docIntelEndpoint
 output extractedContainerName string = storageResources.outputs.extractedContainerName
 output rawContainerName string = storageResources.outputs.rawContainerName
 output aiSearchEndpoint string = aiSearch.outputs.aiSearchEndpoint
+output embeddingModelName string = aiFoundry.outputs.embeddingModelName
+output chatModelName string = aiFoundry.outputs.chatModelName
+output storageAccountName string = safeStorageAccountName
+output aiFoundryEndpoint string = aiFoundry.outputs.aiFoundryEndpoint
+
 

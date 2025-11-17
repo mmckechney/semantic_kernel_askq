@@ -3,6 +3,8 @@ param aiFoundryName string
 param location string= resourceGroup().location
 var aiFoundryResourceName = '${aiFoundryName}-resource'
 
+var chatModel string = 'gpt-5-mini'
+var embeddingModel string = 'text-embedding-3-large'
 
 resource aiFoundryResourceName_resource 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: aiFoundryResourceName
@@ -32,15 +34,7 @@ resource aiFoundryResourceName_resource 'Microsoft.CognitiveServices/accounts@20
   }
 }
 
-resource aiFoundryResourceName_Default 'Microsoft.CognitiveServices/accounts/defenderForAISettings@2025-06-01' = {
-  parent: aiFoundryResourceName_resource
-  name: 'Default'
-  properties: {
-    state: 'Disabled'
-  }
-}
-
-resource aiFoundryResourceName_gpt_4o 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+resource gpt_4o_deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: aiFoundryResourceName_resource
   name: 'gpt-4o'
   sku: {
@@ -59,9 +53,9 @@ resource aiFoundryResourceName_gpt_4o 'Microsoft.CognitiveServices/accounts/depl
   }
 }
 
-resource aiFoundryResourceName_gpt_5_mini 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+resource gpt_5_mini_deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: aiFoundryResourceName_resource
-  name: 'gpt-5-mini'
+  name: chatModel
   sku: {
     name: 'GlobalStandard'
     capacity: 150
@@ -69,37 +63,41 @@ resource aiFoundryResourceName_gpt_5_mini 'Microsoft.CognitiveServices/accounts/
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-5-mini'
+      name: chatModel
       version: '2025-08-07'
     }
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
     currentCapacity: 150
     raiPolicyName: 'Microsoft.DefaultV2'
+    
   }
+  dependsOn: [
+    gpt_4o_deployment
+  ]
 }
 
-resource aiFoundryResourceName_model_router 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
-  parent: aiFoundryResourceName_resource
-  name: 'model-router'
-  sku: {
-    name: 'GlobalStandard'
-    capacity: 250
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'model-router'
-      version: '2025-08-07'
-    }
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-    currentCapacity: 250
-    raiPolicyName: 'Microsoft.DefaultV2'
-  }
-}
+// resource aiFoundryResourceName_model_router 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+//   parent: aiFoundryResourceName_resource
+//   name: 'model-router'
+//   sku: {
+//     name: 'GlobalStandard'
+//     capacity: 250
+//   }
+//   properties: {
+//     model: {
+//       format: 'OpenAI'
+//       name: 'model-router'
+//       version: '2025-08-07'
+//     }
+//     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+//     currentCapacity: 250
+//     raiPolicyName: 'Microsoft.DefaultV2'
+//   }
+// }
 
-resource aiFoundryResourceName_text_embedding_3_large 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+resource text_embedding_3_large_deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: aiFoundryResourceName_resource
-  name: 'text-embedding-3-large'
+  name: embeddingModel
   sku: {
     name: 'GlobalStandard'
     capacity: 150
@@ -107,17 +105,20 @@ resource aiFoundryResourceName_text_embedding_3_large 'Microsoft.CognitiveServic
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'text-embedding-3-large'
+      name: embeddingModel
       version: '1'
     }
     versionUpgradeOption: 'NoAutoUpgrade'
     currentCapacity: 150
     raiPolicyName: 'Microsoft.DefaultV2'
   }
+  dependsOn: [
+    gpt_5_mini_deployment
+  ]
 }
 
 
-resource aiFoundryResourceName_mimcke_aifoundry 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
   parent: aiFoundryResourceName_resource
   name: aiFoundryName
   location: location
@@ -127,153 +128,7 @@ resource aiFoundryResourceName_mimcke_aifoundry 'Microsoft.CognitiveServices/acc
   properties: {}
 }
 
-resource aiFoundryResourceName_Microsoft_Default 'Microsoft.CognitiveServices/accounts/raiPolicies@2025-06-01' = {
-  parent: aiFoundryResourceName_resource
-  name: 'Microsoft.Default'
-  properties: {
-    mode: 'Blocking'
-    contentFilters: [
-      {
-        name: 'Hate'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Hate'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Sexual'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Sexual'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Violence'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Violence'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Selfharm'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Selfharm'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-    ]
-  }
-}
-
-resource aiFoundryResourceName_Microsoft_DefaultV2 'Microsoft.CognitiveServices/accounts/raiPolicies@2025-06-01' = {
-  parent: aiFoundryResourceName_resource
-  name: 'Microsoft.DefaultV2'
-  properties: {
-    mode: 'Blocking'
-    contentFilters: [
-      {
-        name: 'Hate'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Hate'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Sexual'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Sexual'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Violence'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Violence'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Selfharm'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Selfharm'
-        severityThreshold: 'Medium'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Jailbreak'
-        blocking: true
-        enabled: true
-        source: 'Prompt'
-      }
-      {
-        name: 'Protected Material Text'
-        blocking: true
-        enabled: true
-        source: 'Completion'
-      }
-      {
-        name: 'Protected Material Code'
-        blocking: false
-        enabled: true
-        source: 'Completion'
-      }
-    ]
-  }
-}
-
+output docIntelPrincipalId string = foundryProject.identity.principalId
+output embeddingModelName string = embeddingModel
+output chatModelName string = chatModel
+output aiFoundryEndpoint string = aiFoundryResourceName_resource.properties.endpoints['AI Foundry API']

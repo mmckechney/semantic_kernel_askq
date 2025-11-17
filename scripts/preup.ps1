@@ -38,6 +38,7 @@ Set-EnvironmentVariable -Name "AZURE_STORAGEACCT_NAME" -Value "$($safeEnvName)st
 Set-EnvironmentVariable -Name "AZURE_DOCUMENTINTELLIGENCE_ACCOUNT_NAME" -Value "$envName-aidoc"
 Set-EnvironmentVariable -Name "AZURE_AISEARCH_NAME" -Value "$envName-aisearch"
 Set-EnvironmentVariable -Name "AZURE_AIFOUNDRY_NAME" -Value "$envName-aifoundry"
+Set-EnvironmentVariable -Name "AZURE_KEYVAULT_NAME" -Value "$envName-keyvault"
 
 # Write all environment variables to .env file
 Write-Host "Writing environment variables to .env file at $envFilePath"
