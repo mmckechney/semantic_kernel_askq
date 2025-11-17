@@ -11,8 +11,6 @@ namespace DocumentQuestions.Library
       public const string OPENAI_EMBEDDING_MODEL_NAME = "OPENAI_EMBEDDING_MODEL_NAME";
       public const string AIFOUNDRY_ENDPOINT = "AIFOUNDRY_ENDPOINT";
 
-      public const string OPENAI_ENDPOINT = "OPENAI_ENDPOINT";
-      public const string OPENAI_KEY = "OPENAI_KEY";
 
       public const string AISEARCH_ENDPOINT = "AISEARCH_ENDPOINT";
       public const string AISEARCH_KEY = "AISEARCH_KEY";
@@ -25,7 +23,6 @@ namespace DocumentQuestions.Library
       public const string STORAGE_ACCOUNT_QUEUE_URL = "STORAGE_ACCOUNT_BLOB_URL:queueServiceUri";
 
       public const string EXTRACTED_CONTAINER_NAME = "EXTRACTED_CONTAINER_NAME";
-
       public const string RAW_CONTAINER_NAME = "RAW_CONTAINER_NAME";
 
       public const string APPLICATIONINSIGHTS_CONNECTION_STRING = "APPLICATIONINSIGHTS_CONNECTION_STRING";

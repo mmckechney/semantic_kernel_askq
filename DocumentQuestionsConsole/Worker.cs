@@ -8,6 +8,7 @@ using Microsoft.Identity.Client;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using syS = System;
 
@@ -43,6 +44,7 @@ namespace DocumentQuestions.Console
          aiSearch = aiSrch;
          Worker.localToolsUtility = localToolsUtility;
          Worker.localToolsLibrary = localToolsLibrary;
+         LocalToolsExtensions.ConfigureLogger(logger);
 
       }
 
@@ -52,21 +54,10 @@ namespace DocumentQuestions.Console
          {
             return;
          }
-         //if (string.IsNullOrWhiteSpace(activeDocument))
-         //{
-         //   //log.LogInformation("Please use the 'doc' command to set an active document to start asking questions.", ConsoleColor.Yellow);
-         //   return;
-         //}
+
          string quest = string.Join(" ", question);
          syS.Console.WriteLine("----------------------");
-         //var docContent = await agentUtility.SearchForReleventContent(activeDocument, quest);
-         //if (string.IsNullOrWhiteSpace(docContent))
-         //{
-         //   log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
-         //}
-         //else
-         //{
-            // Use thread-based conversation for follow-up questions
+
             StringBuilder responseBuilder = new();
             await foreach (var (text,thread) in agentUtility.AskQuestionStreamingWithThread (quest, activeDocument, currentThread))
             {
@@ -74,24 +65,7 @@ namespace DocumentQuestions.Console
                responseBuilder.Append(text);
                currentThread = thread; // Update thread for next question
             }
-            
-            //var messages = await agentUtility.GetThreadMessages(currentThread);
-            //syS.Console.WriteLine();
-            //log.LogInformation($"{messages}", ConsoleColor.DarkGray);
-            // Display turn count
-            //int turnCount = currentThread.Serialize().GetProperty("messages").GetArrayLength();
-            //if (turnCount > 2)
-            //{
-            //   syS.Console.WriteLine();
-            //   log.LogInformation($"[Conversation turn: {turnCount / 2}]", ConsoleColor.DarkGray);
-            //}
-         //}
 
-         //syS.Console.WriteLine();
-         //var steps = await agentUtility.GetThreadSteps(currentThread);
-         //syS.Console.WriteLine(steps);
-         //syS.Console.WriteLine();
-         //syS.Console.WriteLine("PLEASE NOTE: This does not constitue legal advice or counsel.");
          syS.Console.WriteLine("----------------------");
          syS.Console.WriteLine();
       }
@@ -103,81 +77,23 @@ namespace DocumentQuestions.Console
          return Task.CompletedTask;
       }
 
-      internal static async void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
-      {
-         if (string.IsNullOrWhiteSpace(chatModel) && string.IsNullOrWhiteSpace(chatDeployment) && string.IsNullOrWhiteSpace(embedModel) && string.IsNullOrWhiteSpace(embedDeployment))
-         {
-            await rootParser.InvokeAsync("ai set -h");
-            return;
-         }
-         bool changed = false;
-         if (!string.IsNullOrWhiteSpace(chatModel))
-         {
-            config[Constants.OPENAI_CHAT_MODEL_NAME] = chatModel;
-            log.LogInformation(new() { { "Set chat model to", ConsoleColor.DarkYellow }, { chatModel, ConsoleColor.Yellow } });
-            changed = true;
-         }
-         if (!string.IsNullOrWhiteSpace(chatDeployment))
-         {
-            config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] = chatDeployment;
-            log.LogInformation(new() { { "Set chat deployment to", ConsoleColor.DarkYellow }, { chatDeployment, ConsoleColor.Yellow } });
-            changed = true;
-         }
-         if (!string.IsNullOrWhiteSpace(embedModel))
-         {
-            config[Constants.OPENAI_EMBEDDING_MODEL_NAME] = embedModel;
-            log.LogInformation(new() { { "Set embedding model to", ConsoleColor.DarkYellow }, { embedModel, ConsoleColor.Yellow } });
-            changed = true;
-         }
-         if (!string.IsNullOrWhiteSpace(embedDeployment))
-         {
-            config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] = embedDeployment;
-            log.LogInformation(new() { { "Set embedding deployment to", ConsoleColor.DarkYellow }, { embedDeployment, ConsoleColor.Yellow } });
-            changed = true;
-         }
 
-         if (changed)
-         {
-            agentUtility.InitAgents();
-            ListAiSettings();
-         }
-      }
-
-      internal async static Task ClearIndex(string[] indexes)
+      internal async static Task ClearIndex()
       {
-         if (indexes.Length > 0)
+
+         var deleted = await aiSearch.ClearIndexes([AiSearch.IndexName]);
+         if (deleted.Count > 0)
          {
-            var deleted = await aiSearch.ClearIndexes(indexes.ToList());
-            if (deleted.Count > 0)
+            log.LogInformation("The following indexes were deleted:", ConsoleColor.Yellow);
+            foreach (var name in deleted)
             {
-               log.LogInformation("The following indexes were deleted:", ConsoleColor.Yellow);
-               foreach (var name in deleted)
-               {
-                  log.LogInformation($"\t{name}");
-               }
-            }
-            else
-            {
-               log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
+               log.LogInformation($"\t{name}");
             }
          }
          else
          {
             log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
          }
-      }
-
-      internal static void ListAiSettings()
-      {
-         int pad = 21;
-         log.LogInformation("-------------------------------------");
-         log.LogInformation("Azure OpenAI settings", ConsoleColor.Gray);
-         log.LogInformation(new() { { "Chat Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_MODEL_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Chat Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_MODEL_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME], ConsoleColor.Blue } });
-         log.LogInformation("-------------------------------------");
-
 
       }
 
@@ -214,7 +130,7 @@ namespace DocumentQuestions.Console
             return;
          }
        
-         await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
+         await documentIntelligence.ProcessDocument(new FileInfo(name), model);
 
       }
 
@@ -222,6 +138,7 @@ namespace DocumentQuestions.Console
       {
          var docName = string.Join(" ", document);
          activeDocument = docName;
+         Worker.currentThread = null;
       }
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)

@@ -54,7 +54,7 @@ namespace DocumentQuestions.Library
       }
 
 
-      public async Task ProcessDocument(Uri fileUri, string modelId = "prebuilt-layout", string indexName = "")
+      public async Task ProcessDocument(Uri fileUri, string modelId = "prebuilt-layout")
       {
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
@@ -66,10 +66,10 @@ namespace DocumentQuestions.Library
             };
             operation = await docIntelClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, opts);
          AnalyzeResult result = operation.Value;
-         await ProcessDocumentResults(result, fileUri.AbsoluteUri, indexName);
+         await ProcessDocumentResults(result, fileUri.AbsoluteUri);
       }
 
-      public async Task ProcessDocument(FileInfo file, string modelId = "prebuilt-layout", string indexName = "")
+      public async Task ProcessDocument(FileInfo file, string modelId = "prebuilt-layout")
       {
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
@@ -86,29 +86,27 @@ namespace DocumentQuestions.Library
          }
          AnalyzeResult result = operation.Value;
 
-         await ProcessDocumentResults(result, file.FullName, indexName);
+         await ProcessDocumentResults(result, file.FullName);
       }
 
-      public async Task ProcessDocumentResults(AnalyzeResult result, string filePathOrUrl, string indexName)
+      public async Task ProcessDocumentResults(AnalyzeResult result, string filePathOrUrl)
       {
-
-         indexName = Common.SafeIndexName(filePathOrUrl, indexName);
-
          if (result != null)
          {
+            var fileName = Common.GetFileNameForBlob(filePathOrUrl);
             string content = result.Content;
             var contentLines = content.Split("\n").ToList();
            
 
             log.LogInformation($"Writing document Markdown to bloc...");
-            await common.WriteAnalysisContentToBlob(indexName,result.Content, log);
+            await common.WriteAnalysisContentToBlob(fileName, result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
-            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, 7000);
+            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, AiSearch.EmbeddingChunkSize);
             var taskList = new List<Task>();
 
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
             //taskList.Add(aiSearch.StoreDataInIndex(indexName, Common.BaseFileName(filePathOrUrl), chunked));
-            taskList.Add(aiSearch.StoreDataInIndex(AiSearch.IndexName, Common.BaseFileName(filePathOrUrl), chunked));
+            taskList.Add(aiSearch.StoreDataInIndex(AiSearch.IndexName, fileName, chunked));
             Task.WaitAll(taskList.ToArray());
          }
          log.LogInformation("Document Processed and Indexed");

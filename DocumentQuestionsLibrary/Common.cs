@@ -33,18 +33,11 @@ namespace DocumentQuestions.Library
          }
       }
 
-      public static string SafeIndexName(string fileName, string customIndexName)
+      public static string GetFileNameForBlob(string filePathOrUrl)
       {
-         string safeIndexName = "";
-         if (!string.IsNullOrWhiteSpace(customIndexName))
-         {
-            safeIndexName = Common.ReplaceInvalidCharacters(customIndexName);
-         }
-         else
-         {
-
+            string fileName;
             Uri uri;
-            if (Uri.TryCreate(fileName, UriKind.RelativeOrAbsolute, out uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
+            if (Uri.TryCreate(filePathOrUrl, UriKind.RelativeOrAbsolute, out uri) && uri.IsAbsoluteUri && uri.Scheme != Uri.UriSchemeFile)
             {
                // It's a URL
                fileName =  Path.GetFileNameWithoutExtension(uri.AbsolutePath);
@@ -52,11 +45,9 @@ namespace DocumentQuestions.Library
             else
             {
                // It's a local file path
-               fileName = Path.GetFileNameWithoutExtension(fileName);
+               fileName = Path.GetFileNameWithoutExtension(filePathOrUrl);
             }
-            safeIndexName = Common.ReplaceInvalidCharacters(fileName.ToLower());
-         }
-         return safeIndexName;
+         return fileName;
       }
 
       public static string BaseFileName(string filePathOrUrl)

@@ -43,14 +43,8 @@ namespace DocumentQuestions.Console
          var listCommand = new Command("list", "List the available files to ask questions about");
          listCommand.Handler = CommandHandler.Create(Worker.ListFiles);
 
-         var clearIndexCommand = new Command("clear-index", "Clears the index for the specified files or for all files if \"all\" is used");
-         var clearIndexArg = new Argument<string[]>("indexes", "Names of indexes (files) to clear. User \"all\" to delete all indexes") { Arity = ArgumentArity.ZeroOrMore };
-         clearIndexCommand.Add(clearIndexArg);
-         clearIndexCommand.Handler = CommandHandler.Create<string[]>(Worker.ClearIndex);
-
-         var resetCommand = new Command("reset", "Reset the conversation thread to start a new conversation");
-         resetCommand.Handler = CommandHandler.Create(Worker.ResetConversation);
-
+         var clearIndexCommand = new Command("clear-index", "Clears the index of all records");
+         clearIndexCommand.Handler = CommandHandler.Create(Worker.ClearIndex);
 
          RootCommand rootCommand = new RootCommand(description: $"Utility to ask questions on documents that have been indexed in Azure AI Search");
          rootCommand.Add(questionArg);
@@ -59,9 +53,7 @@ namespace DocumentQuestions.Console
          rootCommand.Add(askQuestionCommand);
          rootCommand.Add(processFileCommand);
          rootCommand.Add(listCommand);
-         rootCommand.Add(clearIndexCommand);
-         rootCommand.Add(resetCommand);
-         rootCommand.Add(AIRuntimeSetCommand());
+         rootCommand.Add(clearIndexCommand);        
 
          var parser = new CommandLineBuilder(rootCommand)
               .UseDefaults()
@@ -78,35 +70,5 @@ namespace DocumentQuestions.Console
 
          return parser;
       }
-
-
-      private static Command AIRuntimeSetCommand()
-      {
-         var chatModelOpt = new Option<string>(new string[] { "--chat-model", "--cm" }, "Name of GPT chat model to use (must match model associated with chat deployment)");
-         var chatDepoymentOpt = new Option<string>(new string[] { "--chat-deployment", "--cd" }, "Name of GPT chat deployment to use");
-
-         var embedModelOpt = new Option<string>(new string[] { "--embed-model", "--em" }, "Name of model to use for text embedding (must match model associated with embedding deployment)");
-         var embedDepoymentOpt = new Option<string>(new string[] { "--embed-deployment", "--ed" }, "Name of text embedding deployment to use");
-
-         var listAICmd = new Command("list", "List the configured Azure OpenAI settings");
-         listAICmd.Handler = CommandHandler.Create(Worker.ListAiSettings);
-
-
-         var aiSetCmd = new Command("set", "Change the Azure OpenAI model and deployment runtime settings")
-         {
-            listAICmd,
-            chatModelOpt,
-            chatDepoymentOpt,
-            embedModelOpt,
-            embedDepoymentOpt
-         };
-         aiSetCmd.Handler = CommandHandler.Create<string, string, string, string>(Worker.AzureOpenAiSettings);
-
-         var aiCmd = new Command("ai", "Change or List Azure OpenAI model and deployment runtime settings");
-         aiCmd.Add(aiSetCmd);
-         aiCmd.Add(listAICmd);
-         return aiCmd;
-      }
-
    }
 }

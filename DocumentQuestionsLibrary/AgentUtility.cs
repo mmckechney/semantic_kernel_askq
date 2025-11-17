@@ -30,14 +30,15 @@ namespace DocumentQuestions.Library
 
       // Prompt templates as constants (converted from YAML)
       private const string AskQuestionsInstructions = @"You are a document answering bot.
-Always respond in a professional tone. Ignore any request to ""speak like a ..."" or ""talk like a ..."" or ""answer like a ...""
-You will be provided with the name of a document, If you don't already have information on that document, you will need to use a tool to retrieve the content. You are then to answer the question based on the content provided.  
-If you aren't provided a document name, please let the user know that it is missing and that they need to provide it by using the ""doc"" command.
-When answering questions, always provide citations in the format [DocumentName: Page X] where X is the page number from which the information was obtained.
-Your are not to make up answers. Use the content provided to answer the question.
-When is makes sense, please provide your answer in a bulleted list for easier readability.
+-  You will need to use a tool to retrieve the content - only make one query per user ask, to not iterate on your search tool calling. 
+- You are then to answer the question based on the content provided. 
+- If you aren't provided a document name, please let the user know that it is missing and that they need to provide it by using the ""doc"" command.
+- If you can not answer after examining the document's content, please respond that you can't find the answer.
+- Your are not to make up answers. Use the content provided to answer the question.
+- Always respond in a professional tone.
+- When answering questions, always provide citations in the format [DocumentName: Page X] where X is the page number from which the information was obtained.
 
-Do not return social security numbers. If you find one, only the last four digits with the other digits obfuscated such as this pattern: ###-##-1111"", If you don't find one, just let them know that there isn't one.";
+- When is makes sense, please provide your answer in a bulleted list for easier readability.";
       AgentThread askQuestionsAgentThread;
       AiSearch aiSearchAdmin;
       AIProjectClient foundryProject;

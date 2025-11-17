@@ -4,17 +4,12 @@ targetScope = 'subscription'
 @description('Primary location for all resources')
 param location string
 param resourceGroupName string
-param functionAppName string
 param keyVaultName string
 param storageAccountName string
 param docIntelligenceAccountName string
 param aiSearchName string
 param currentUserObjectId string
-param openAIChatModel string
-param openAIChatDeploymentName string
-param openAIEmbeddingDeploymentName string
-param openAIEmbeddingModel string
-param openAIServiceName string
+param aiFoundryName string
 
 
 var safeStorageAccountName = toLower(replace(storageAccountName, '-', ''))
@@ -29,6 +24,18 @@ module keyVault 'keyvault.bicep' = {
     params: {
         location: location
         keyVaultName: keyVaultName
+    }
+    dependsOn: [
+        rg
+    ]
+}
+
+module aiFoundry 'aifoundryresource.bicep' = {
+    name: 'aiFoundry'
+    scope: resourceGroup(resourceGroupName)
+    params: {
+        aiFoundryName: aiFoundryName
+        location: location
     }
     dependsOn: [
         rg
@@ -74,27 +81,6 @@ module storageResources 'storage.bicep' = {
     ]
 }
 
-module functionResources 'function.bicep' = {
-    name: 'azureResources'
-    scope: resourceGroup(resourceGroupName)
-    params: {
-        functionAppName: functionAppName
-        location: location
-        openAIChatModel: openAIChatModel
-        openAIChatDeploymentName: openAIChatDeploymentName
-        openAIEmbeddingModel: openAIEmbeddingModel
-        openAIEmbeddingDeploymentName: openAIEmbeddingDeploymentName
-        storageAccountName: safeStorageAccountName
-        extractedBlobContainerName: storageResources.outputs.extractedContainerName
-        rawBlobContainerName: storageResources.outputs.rawContainerName
-        keyVaultName: keyVaultName
-        aiSearchEndpoint : aiSearch.outputs.aiSearchEndpoint
-        docIntelligenceEndpoint : docIntelligence.outputs.docIntelEndpoint
-    }
-    dependsOn: [
-        rg
-    ]
-}
 
 module roleAssignments 'roleassignments.bicep' = {
     name: 'roleAssignments'
@@ -102,7 +88,6 @@ module roleAssignments 'roleassignments.bicep' = {
     params: {
   
         cogSvcsPrincipalId: docIntelligence.outputs.docIntelPrincipalId
-        functionPrincipalId: functionResources.outputs.functionAppId
         currentUserObjectId : currentUserObjectId
 
     }
@@ -111,33 +96,7 @@ module roleAssignments 'roleassignments.bicep' = {
     ]
 }
 
-module openAI 'azureopenai.bicep' = {
-    name: 'azureOpenAI'
-    scope: resourceGroup(resourceGroupName)
-   params: {
-    location: location
-    name: openAIServiceName
-    chatModel: openAIChatModel
-    chatDeploymentName: openAIChatDeploymentName
-    embeddingModel: openAIEmbeddingModel
-    embeddingDeploymentName: openAIEmbeddingDeploymentName
-    keyVaultName: keyVaultName
-   }
-    dependsOn: [
-        rg
-        keyVault
-    ]
-}
-
 var openAiUserRole = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-var functionAppId = functionResources.outputs.functionAppId
-resource func_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-    name: guid(functionAppName, openAiUserRole, subscription().id)
-    properties: {
-        roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAiUserRole)
-        principalId: functionAppId
-    }
-}
 
 resource user_openai_user_role 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     name: guid(currentUserObjectId, openAiUserRole, subscription().id)

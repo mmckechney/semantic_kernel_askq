@@ -28,7 +28,8 @@ namespace DocumentQuestions.Library
       private const string FileNameFieldName = "fileName";
       private const string IdFieldName = "id";
       public const string IndexName = "general";
-
+      public const int EmbeddingChunkSize = 7000;
+      public const int MaxItemReturnCount = 10;
       private IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator;
       private SearchIndexClient indexClient;
       private EmbeddingClient embeddingClient;
@@ -41,17 +42,20 @@ namespace DocumentQuestions.Library
          string endpoint = config[Constants.AISEARCH_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_ENDPOINT} in configuration");
          this.searchEndpointUri = new Uri(endpoint);
          string key = config[Constants.AISEARCH_KEY] ?? throw new ArgumentException($"Missing {Constants.AISEARCH_KEY} in configuration");
+
          // Create a client
          this.searchCredential = new AzureKeyCredential(key);
          indexClient = new SearchIndexClient(searchEndpointUri, searchCredential);
 
-         //var openAIEndpoint = config[Constants.OPENAI_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.OPENAI_ENDPOINT} in configuration.");
+
          var embeddingModel = config[Constants.OPENAI_EMBEDDING_MODEL_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_MODEL_NAME} in configuration.");
          var embeddingDeploymentName = config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] ?? throw new ArgumentException($"Missing {Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME} in configuration.");
-         //var apiKey = config[Constants.OPENAI_KEY] ?? throw new ArgumentException($"Missing {Constants.OPENAI_KEY} in configuration.");
+
 
          AIProjectClient foundryClient  =  new AIProjectClient(new Uri(config[Constants.AIFOUNDRY_ENDPOINT] ?? throw new ArgumentException($"Missing {Constants.AIFOUNDRY_ENDPOINT} in configuration.")), new DefaultAzureCredential());
 
+
+         //Create 
          ClientConnection connection = foundryClient.GetConnection(typeof(AzureOpenAIClient).FullName!);
          if (!connection.TryGetLocatorAsUri(out Uri uri) || uri is null)
          {
@@ -124,14 +128,22 @@ namespace DocumentQuestions.Library
             var embedding = await embeddingGenerator!.GenerateAsync(query, cancellationToken: cancellationToken).ConfigureAwait(false);
             var vectorQuery = new VectorizedQuery(embedding.Vector.ToArray())
             {
-               KNearestNeighborsCount = 30
+               KNearestNeighborsCount = MaxItemReturnCount,
+               Fields = { VectorFieldName }
             };
-            vectorQuery.Fields.Add(VectorFieldName);
 
             var options = new SearchOptions
             {
-               Size = 30,
-               VectorSearch = new VectorSearchOptions()
+               Size = MaxItemReturnCount,
+               QueryType = SearchQueryType.Semantic, 
+               VectorSearch = new VectorSearchOptions(),
+               SemanticSearch = new SemanticSearchOptions
+               {
+                  SemanticConfigurationName = "semantics",
+                  QueryCaption = new QueryCaption(QueryCaptionType.Extractive),
+                  QueryAnswer = new QueryAnswer(QueryAnswerType.Extractive)
+               },
+               Debug = new QueryDebugMode()
             };
             
             // Add filter to restrict results to specific fileName
@@ -168,6 +180,7 @@ namespace DocumentQuestions.Library
 
          return searchResult;
       }
+      
       public async Task<List<string>> ListAvailableIndexes(bool unquoted = false)
       {
          try
@@ -192,43 +205,7 @@ namespace DocumentQuestions.Library
             return new List<string>();
          }
       }
-
-      //private async Task EnsureSearchIndexExistsAsync(string indexName)
-      //{
-      //   try
-      //   {
-      //      await indexClient.GetIndexAsync(indexName);
-      //   }
-      //   catch (RequestFailedException ex) when (ex.Status == 404)
-      //   {
-      //      // Create the index if it doesn't exist
-      //      var definition = new SearchIndex(indexName)
-      //      {
-      //         Fields =
-      //         {
-      //            new SimpleField("id", SearchFieldDataType.String) { IsKey = true, IsFilterable = true },
-      //            new SearchableField("externalSourceName") { IsFilterable = true },
-      //            new SearchableField("externalId") { IsFilterable = true },
-      //            new SearchableField("description"),
-      //            new SearchableField("text"),
-      //            new SearchField("embedding", SearchFieldDataType.Collection(SearchFieldDataType.Single))
-      //            {
-      //               IsSearchable = true,
-      //               VectorSearchDimensions = 3072, // text-embedding-3-large dimension
-      //               VectorSearchProfileName = "vector-profile"
-      //            }
-      //         },
-      //         VectorSearch = new VectorSearch
-      //         {
-      //            Profiles = { new VectorSearchProfile("vector-profile", "vector-config") },
-      //            Algorithms = { new HnswAlgorithmConfiguration("vector-config") }
-      //         }
-      //      };
-
-      //      await indexClient.CreateIndexAsync(definition);
-      //      log.LogInformation($"Created new search index: {indexName}");
-      //   }
-      //}
+     
       public async Task<string> AddIndex(string name)
       {
          try
@@ -337,10 +314,6 @@ namespace DocumentQuestions.Library
       {
          List<string> deleted = new();
          var available = await ListAvailableIndexes(true);
-         if (indexNames.Contains("all", StringComparer.CurrentCultureIgnoreCase))
-         {
-            indexNames = await ListAvailableIndexes(true);
-         }
 
          foreach (var index in indexNames)
          {
@@ -370,7 +343,6 @@ namespace DocumentQuestions.Library
          }
          return deleted;
       }
-
 
       public async Task<IReadOnlyList<string>> GetDistinctFileNamesAsync(string? filter = null, int maxDistinct = 1000)
       {
