@@ -28,8 +28,8 @@ $localSettings = @{
         "$($json.AISEARCH_ENDPOINT)"=   $envValues.aiSearchEndpoint
         "$($json.AISEARCH_KEY)" = $aiSearchKey
 
-        # "$($json.STORAGE_ACCOUNT_BLOB_URL.Replace("__", ":"))" = $appSettingsHash[$json.STORAGE_ACCOUNT_BLOB_URL]
-        # "$($json.STORAGE_ACCOUNT_QUEUE_URL.Replace("__", ":"))" = $appSettingsHash[$json.STORAGE_ACCOUNT_QUEUE_URL]
+        "$($json.STORAGE_ACCOUNT_BLOB_URL.Replace("__", ":"))" =  $envValues.storageBlobEndpoint
+        "$($json.STORAGE_ACCOUNT_QUEUE_URL.Replace("__", ":"))" = $envValues.storageQueueEndpoint
         "$($json.STORAGE_ACCOUNT_NAME)" = $envValues.storageAccountName
         "$($json.EXTRACTED_CONTAINER_NAME)" = $envValues.extractedContainerName
         "$($json.RAW_CONTAINER_NAME)" = $envValues.rawContainerName

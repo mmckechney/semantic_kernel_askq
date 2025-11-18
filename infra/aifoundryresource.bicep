@@ -131,4 +131,4 @@ resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-0
 output docIntelPrincipalId string = foundryProject.identity.principalId
 output embeddingModelName string = embeddingModel
 output chatModelName string = chatModel
-output aiFoundryEndpoint string = aiFoundryResourceName_resource.properties.endpoints['AI Foundry API']
+output aiFoundryEndpoint string = foundryProject.properties.endpoints['AI Foundry API']

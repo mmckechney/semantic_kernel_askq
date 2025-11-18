@@ -346,6 +346,7 @@ namespace DocumentQuestions.Library
 
       public async Task<IReadOnlyList<string>> GetDistinctFileNamesAsync(string? filter = null, int maxDistinct = 1000)
       {
+         await AddIndex(AiSearch.IndexName);
          // We only need facets, not actual documents
          var options = new SearchOptions
          {

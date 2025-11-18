@@ -115,5 +115,7 @@ output embeddingModelName string = aiFoundry.outputs.embeddingModelName
 output chatModelName string = aiFoundry.outputs.chatModelName
 output storageAccountName string = safeStorageAccountName
 output aiFoundryEndpoint string = aiFoundry.outputs.aiFoundryEndpoint
+output storageBlobEndpoint string = storageResources.outputs.blobEndpoint
+output storageQueueEndpoint string = storageResources.outputs.queueEndpoint
 
 

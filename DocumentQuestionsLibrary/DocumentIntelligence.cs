@@ -98,7 +98,7 @@ namespace DocumentQuestions.Library
             var contentLines = content.Split("\n").ToList();
            
 
-            log.LogInformation($"Writing document Markdown to bloc...");
+            log.LogInformation($"Writing document Markdown to blob...");
             await common.WriteAnalysisContentToBlob(fileName, result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
             var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, AiSearch.EmbeddingChunkSize);
