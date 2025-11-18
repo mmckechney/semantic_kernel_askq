@@ -33,26 +33,6 @@ resource aiFoundryResourceName_resource 'Microsoft.CognitiveServices/accounts@20
     disableLocalAuth: false
   }
 }
-
-resource gpt_4o_deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
-  parent: aiFoundryResourceName_resource
-  name: 'gpt-4o'
-  sku: {
-    name: 'GlobalStandard'
-    capacity: 100
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o'
-      version: '2024-11-20'
-    }
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-    currentCapacity: 100
-    raiPolicyName: 'Microsoft.DefaultV2'
-  }
-}
-
 resource gpt_5_mini_deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: aiFoundryResourceName_resource
   name: chatModel
@@ -71,29 +51,7 @@ resource gpt_5_mini_deployment 'Microsoft.CognitiveServices/accounts/deployments
     raiPolicyName: 'Microsoft.DefaultV2'
     
   }
-  dependsOn: [
-    gpt_4o_deployment
-  ]
 }
-
-// resource aiFoundryResourceName_model_router 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
-//   parent: aiFoundryResourceName_resource
-//   name: 'model-router'
-//   sku: {
-//     name: 'GlobalStandard'
-//     capacity: 250
-//   }
-//   properties: {
-//     model: {
-//       format: 'OpenAI'
-//       name: 'model-router'
-//       version: '2025-08-07'
-//     }
-//     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-//     currentCapacity: 250
-//     raiPolicyName: 'Microsoft.DefaultV2'
-//   }
-// }
 
 resource text_embedding_3_large_deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: aiFoundryResourceName_resource
