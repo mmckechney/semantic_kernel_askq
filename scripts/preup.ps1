@@ -9,39 +9,20 @@ if (-not $currentUserObjectId) {
 
 $envValues = azd env get-values --output json | ConvertFrom-Json
 $AZURE_LOCATION = $envValues.AZURE_LOCATION
+$envValues = azd env get-values --output json | ConvertFrom-Json
 $envName = $envValues.AZURE_ENV_NAME
 $safeEnvName = $envName -replace '[^a-zA-Z0-9]', ''
 
-# Path to .env file
-$envFilePath = Join-Path (Split-Path $PSScriptRoot -Parent) ".env"
-$envContent = @()
-
-# Function to set environment variables in both azd and .env file
-function Set-EnvironmentVariable {
-    param (
-        [string]$Name,
-        [string]$Value
-    )
-    
-    # Set in azd environment
-    Write-Host "Setting $Name to $Value"
-    azd env set $Name $Value
-    
-    # Add to .env content
-    $envContent += "$Name=$Value"
-}
-
 # Set the user object ID as an environment variable for the deployment
-Set-EnvironmentVariable -Name "AZURE_CURRENT_USER_OBJECT_ID" -Value $currentUserObjectId
-Set-EnvironmentVariable -Name "AZURE_RESOURCEGROUP_NAME" -Value "$envName-rg"
-Set-EnvironmentVariable -Name "AZURE_STORAGEACCT_NAME" -Value "$($safeEnvName)storage"
-Set-EnvironmentVariable -Name "AZURE_DOCUMENTINTELLIGENCE_ACCOUNT_NAME" -Value "$envName-aidoc"
-Set-EnvironmentVariable -Name "AZURE_AISEARCH_NAME" -Value "$envName-aisearch"
-Set-EnvironmentVariable -Name "AZURE_AIFOUNDRY_NAME" -Value "$envName-aifoundry"
-Set-EnvironmentVariable -Name "AZURE_KEYVAULT_NAME" -Value "$envName-keyvault"
+#azd env set "AZURE_LOCATION" $AZURE_LOCATION
+azd env set "AZURE_CURRENT_USER_OBJECT_ID" $currentUserObjectId
+azd env set "AZURE_RESOURCEGROUP_NAME" "$envName-rg"
+azd env set "AZURE_STORAGEACCT_NAME" "$($safeEnvName)storage"
+azd env set "AZURE_DOCUMENTINTELLIGENCE_ACCOUNT_NAME" "$envName-aidoc"
+azd env set "AZURE_AISEARCH_NAME" "$envName-aisearch"
+azd env set "AZURE_AIFOUNDRY_NAME" "$envName-aifoundry"
+azd env set "AZURE_KEYVAULT_NAME" "$envName-keyvault"
 
-# Write all environment variables to .env file
-Write-Host "Writing environment variables to .env file at $envFilePath"
-$envContent | Out-File -FilePath $envFilePath -Encoding utf8 -Force
-Write-Host ".env file created/updated successfully."
+
+azd env get-values
 

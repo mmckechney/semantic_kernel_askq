@@ -4,23 +4,15 @@ metadata:
 
 
 infra:
-  bicep: ./infra/main.bicep
-  parameters:
-    location: $(AZURE_LOCATION)
-    resourceGroupName: $(AZURE_RESOURCEGROUP_NAME)
-    functionAppName: $(AZURE_FUNCTIONAPP_NAME)
-    keyVaultName: $(AZURE_KEYVAULT_NAME)
-    storageAccountName: $(AZURE_STORAGEACCT_NAME)
-    docIntelligenceAccountName: $(AZURE_DOCUMENTINTELLIGENCE_ACCOUNT_NAME)
-    aiSearchName: $(AZURE_AISEARCH_NAME)
-    currentUserObjectId: $(AZURE_CURRENT_USER_OBJECT_ID)
-    aiFoundryName: $(AZURE_AIFOUNDRY_NAME)
+  provider: bicep
+  path: ./infra
+  module: main
 
 hooks:
   preup: 
     - shell: pwsh
       run: ./scripts/preup.ps1
-  
+
   postdeploy:
     - shell: pwsh
       run: ./scripts/postdeploy.ps1
