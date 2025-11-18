@@ -7,7 +7,7 @@ This solution provides an example of how to process your own documents and then 
 
 **NOTE**: The console app is also provided to demonstrate how to use the AI Foundry and the Agent Framework to ask questions of an AI Agent.
 
-![ Architecture Diagram ](images/Architecture.png)
+![ Architecture Diagram ](images/Architecture-console.png)
 
 ## Updates
 
