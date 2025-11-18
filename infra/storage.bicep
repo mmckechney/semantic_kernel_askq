@@ -35,3 +35,5 @@ resource extractedBlobContainer 'Microsoft.Storage/storageAccounts/blobServices/
 
 output rawContainerName string = rawBlobContainer.name
 output extractedContainerName string = extractedBlobContainer.name
+output blobEndpoint string = storageAccount.properties.primaryEndpoints.blob
+output queueEndpoint string = storageAccount.properties.primaryEndpoints.queue

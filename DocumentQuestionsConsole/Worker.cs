@@ -1,10 +1,14 @@
-﻿using DocumentQuestions.Library;
+﻿using Azure.AI.Agents.Persistent;
+using DocumentQuestions.Library;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Identity.Client;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using syS = System;
 
@@ -16,22 +20,32 @@ namespace DocumentQuestions.Console
       private static ILoggerFactory logFactory;
       private static IConfiguration config;
       private static StartArgs? startArgs;
-      private static SemanticUtility semanticUtility;
+      private static AgentUtility agentUtility;
       private static Common common;
       private static Parser rootParser;
       private static DocumentIntelligence documentIntelligence;
       private static string activeDocument = string.Empty;
       private static AiSearch aiSearch;
-      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, SemanticUtility semanticUtil, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch)
+      private static PersistentAgentThread? currentThread = null; // Thread for multi-turn conversations
+      private static LocalToolsUtility localToolsUtility;
+      private static LocalToolsLibrary localToolsLibrary;
+
+
+
+      public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IConfiguration configuration, StartArgs sArgs, AgentUtility agentUtility, Common cmn, DocumentIntelligence documentIntel, AiSearch aiSrch, LocalToolsUtility localToolsUtility, LocalToolsLibrary localToolsLibrary)
       {
          log = logger;
          logFactory = loggerFactory;
          config = configuration;
          startArgs = sArgs;
          common = cmn;
-         semanticUtility = semanticUtil;
+         Worker.agentUtility = agentUtility;
          documentIntelligence = documentIntel;
          aiSearch = aiSrch;
+         Worker.localToolsUtility = localToolsUtility;
+         Worker.localToolsLibrary = localToolsLibrary;
+         LocalToolsExtensions.ConfigureLogger(logger);
+
       }
 
       internal static async Task AskQuestion(string[] question)
@@ -40,122 +54,62 @@ namespace DocumentQuestions.Console
          {
             return;
          }
-         if (string.IsNullOrWhiteSpace(activeDocument))
-         {
-            //log.LogInformation("Please use the 'doc' command to set an active document to start asking questions.", ConsoleColor.Yellow);
-            return;
-         }
+
          string quest = string.Join(" ", question);
          syS.Console.WriteLine("----------------------");
-         var docContent = await semanticUtility.SearchForReleventContent(activeDocument, quest);
-         if (string.IsNullOrWhiteSpace(docContent))
-         {
-            log.LogInformation("No relevant content found in the document for the question. Please verify your document name with the 'list' command or try another question.", ConsoleColor.Yellow);
-         }
-         else
-         {
-            await foreach (var bit in semanticUtility.AskQuestionStreaming(quest, docContent))
-            {
-               syS.Console.Write(bit);
-            }
-         }
 
-         syS.Console.WriteLine();
-         //syS.Console.WriteLine("PLEASE NOTE: This does not constitue legal advice or counsel.");
+            StringBuilder responseBuilder = new();
+            await foreach (var (text,thread) in agentUtility.AskQuestionStreamingWithThread (quest, activeDocument, currentThread))
+            {
+               syS.Console.Write(text);
+               responseBuilder.Append(text);
+               currentThread = thread; // Update thread for next question
+            }
+
          syS.Console.WriteLine("----------------------");
          syS.Console.WriteLine();
       }
 
-      internal static async void AzureOpenAiSettings(string chatModel, string chatDeployment, string embedModel, string embedDeployment)
+      internal static Task ResetConversation()
       {
-         if (string.IsNullOrWhiteSpace(chatModel) && string.IsNullOrWhiteSpace(chatDeployment) && string.IsNullOrWhiteSpace(embedModel) && string.IsNullOrWhiteSpace(embedDeployment))
-         {
-            await rootParser.InvokeAsync("ai set -h");
-            return;
-         }
-         bool changed = false;
-         if (!string.IsNullOrWhiteSpace(chatModel))
-         {
-            config[Constants.OPENAI_CHAT_MODEL_NAME] = chatModel;
-            log.LogInformation(new() { { "Set chat model to", ConsoleColor.DarkYellow }, { chatModel, ConsoleColor.Yellow } });
-            changed = true;
-         }
-         if (!string.IsNullOrWhiteSpace(chatDeployment))
-         {
-            config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME] = chatDeployment;
-            log.LogInformation(new() { { "Set chat deployment to", ConsoleColor.DarkYellow }, { chatDeployment, ConsoleColor.Yellow } });
-            changed = true;
-         }
-         if (!string.IsNullOrWhiteSpace(embedModel))
-         {
-            config[Constants.OPENAI_EMBEDDING_MODEL_NAME] = embedModel;
-            log.LogInformation(new() { { "Set embedding model to", ConsoleColor.DarkYellow }, { embedModel, ConsoleColor.Yellow } });
-            changed = true;
-         }
-         if (!string.IsNullOrWhiteSpace(embedDeployment))
-         {
-            config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME] = embedDeployment;
-            log.LogInformation(new() { { "Set embedding deployment to", ConsoleColor.DarkYellow }, { embedDeployment, ConsoleColor.Yellow } });
-            changed = true;
-         }
-
-         if (changed)
-         {
-            semanticUtility.InitMemoryAndKernel();
-            ListAiSettings();
-         }
+         currentThread = null;
+         log.LogInformation("Conversation thread reset. Starting fresh conversation.", ConsoleColor.Green);
+         return Task.CompletedTask;
       }
 
-      internal async static Task ClearIndex(string[] indexes)
+
+      internal async static Task ClearIndex()
       {
-         if (indexes.Length > 0)
+
+         var deleted = await aiSearch.ClearIndexes([AiSearch.IndexName]);
+         if (deleted.Count > 0)
          {
-            var deleted = await aiSearch.ClearIndexes(indexes.ToList());
-            if (deleted.Count > 0)
+            log.LogInformation("The following indexes were deleted:", ConsoleColor.Yellow);
+            foreach (var name in deleted)
             {
-               log.LogInformation("The following indexes were deleted:", ConsoleColor.Yellow);
-               foreach (var name in deleted)
-               {
-                  log.LogInformation($"\t{name}");
-               }
-            }
-            else
-            {
-               log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
+               log.LogInformation($"\t{name}");
             }
          }
          else
          {
             log.LogInformation("No indexes were deleted.", ConsoleColor.Yellow);
          }
-      }
-
-      internal static void ListAiSettings()
-      {
-         int pad = 21;
-         log.LogInformation("-------------------------------------");
-         log.LogInformation("Azure OpenAI settings", ConsoleColor.Gray);
-         log.LogInformation(new() { { "Chat Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_MODEL_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Chat Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_CHAT_DEPLOYMENT_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Model:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_MODEL_NAME], ConsoleColor.Blue } });
-         log.LogInformation(new() { { "Embedding Deployment:".PadRight(pad, ' '), ConsoleColor.DarkBlue }, { config[Constants.OPENAI_EMBEDDING_DEPLOYMENT_NAME], ConsoleColor.Blue } });
-         log.LogInformation("-------------------------------------");
-
 
       }
 
       internal async static Task<int> ListFiles(object t)
       {
-         var names = await aiSearch.ListAvailableIndexes();
-         if (names.Count > 0)
+         var fileNames = await aiSearch.GetDistinctFileNamesAsync();
+         //var names = await aiSearch.ListAvailableIndexes();
+         if (fileNames.Count > 0)
          {
             log.LogInformation("List of available documents:", ConsoleColor.Yellow);
          }
-         foreach (var name in names)
+         foreach (var name in fileNames)
          {
             log.LogInformation(name);
          }
-         return names.Count;
+         return fileNames.Count;
       }
 
       internal static async Task ProcessFile(string file, string model, string index)
@@ -175,45 +129,21 @@ namespace DocumentQuestions.Console
             log.LogInformation($"The file {name} doesn't exist. Please enter a valid file name", ConsoleColor.Red);
             return;
          }
+       
+         await documentIntelligence.ProcessDocument(new FileInfo(name), model);
 
-         if (Path.GetExtension(file).ToLower() == ".xml")
-         {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            StringBuilder sb = new();
-            var content = File.ReadAllText(name);
-            await foreach (var bit in semanticUtility.ExtractContentFromXmlDoc(name, content))
-            {
-               syS.Console.Write(bit);
-               sb.Append(bit);
-            }
-            sw.Stop();
-            syS.Console.WriteLine();
-            
-            log.LogInformation($"Extraction time: {Math.Ceiling(sw.Elapsed.TotalSeconds)} seconds", ConsoleColor.Cyan);
-
-            string indexName = Common.SafeIndexName(file, index);
-            string fileName = Common.BaseFileName(file);
-            List<string> contentlst = new() {  name, sb.ToString() };
-            await semanticUtility.StoreMemoryAsync(indexName, fileName, contentlst);
-            await semanticUtility.StoreMemoryAsync("general", fileName, contentlst);
-
-            return;
-         }
-         else
-         {
-            await documentIntelligence.ProcessDocument(new FileInfo(name), model, index);
-         }
       }
 
       internal static void SetActiveDocument(string[] document)
       {
          var docName = string.Join(" ", document);
          activeDocument = docName;
+         Worker.currentThread = null;
       }
 
       protected async override Task ExecuteAsync(CancellationToken stoppingToken)
       {
+
          Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
          rootParser = CommandBuilder.BuildCommandLine();
          string[] args = startArgs.Args;
@@ -222,6 +152,7 @@ namespace DocumentQuestions.Console
          bool firstPass = true;
          int fileCount = 0;
          StringBuilder sb;
+
          while (true)
          {
             sb = new StringBuilder();

@@ -1,8 +1,7 @@
 
 param cogSvcsPrincipalId string
-param functionPrincipalId string
 param currentUserObjectId string
-
+param aiFoundryPrincipalId string
 
 var storageBlobDataContrib = {
   roleName: 'storageBlobDataContrib'
@@ -63,11 +62,6 @@ var roleAssignments = [
   storageAcctContrib
 ]
 
-var funcAssignments = [for role in roleAssignments: {
-    owner: 'function'
-    role: role  
-    principalId: functionPrincipalId  
-}]
 
 var userAssignments = [for role in roleAssignments: {
   owner: 'user'
@@ -81,7 +75,13 @@ var cogSvcsAssignments = [for role in roleAssignments: {
   principalId: cogSvcsPrincipalId  
 }]
 
-var combined = union(funcAssignments, userAssignments, cogSvcsAssignments)
+var aiFoundryAssignments = [for role in roleAssignments: {
+  owner: 'aiFoundry'
+  role: role  
+  principalId: aiFoundryPrincipalId  
+}]
+
+var combined = union(userAssignments, cogSvcsAssignments, aiFoundryAssignments)
 
 resource roleAssignmentsResource 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (assignment, setIndex) in combined: {  
   name:  guid(assignment.owner, assignment.role.roleName, assignment.role.roleId,resourceGroup().id)

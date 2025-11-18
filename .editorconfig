@@ -1,14 +1,7 @@
 ﻿[*.cs]
 
 # SKEXP0003: Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-dotnet_diagnostic.SKEXP0003.severity = suggestion
-dotnet_diagnostic.SKEXP0001.severity = suggestion
-dotnet_diagnostic.SKEXP0020.severity = suggestion
-dotnet_diagnostic.SKEXP0010.severity = suggestion
-dotnet_diagnostic.SKEXP0050.severity = suggestion
-dotnet_diagnostic.SKEXP0052.severity = suggestion
-dotnet_diagnostic.SKEXP0011.severity = suggestion
-dotnet_diagnostic.SKEXP0021.severity = suggestion
+dotnet_diagnostic.OPENAI001.severity = suggestion
 csharp_indent_labels = one_less_than_current
 csharp_using_directive_placement = outside_namespace:silent
 csharp_prefer_simple_using_statement = true:suggestion

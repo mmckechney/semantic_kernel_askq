@@ -9,8 +9,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
-using Microsoft.SemanticKernel.Text;
-using YamlDotNet.Serialization;
 
 namespace DocumentQuestions.Library
 {
@@ -33,15 +31,16 @@ namespace DocumentQuestions.Library
       //private ILoggerFactory logFactory;
       private ILogger<DocumentIntelligence> log;
       private IConfiguration config;
-      private SemanticUtility semanticUtility;
+      private AgentUtility agentUtility;
       private Common common;
-
-      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, SemanticUtility semanticUtility, Common common)
+      private AiSearch aiSearch;
+      public DocumentIntelligence(ILogger<DocumentIntelligence> log, IConfiguration config, AgentUtility agentUtility, AiSearch aiSearch, Common common)
       {
          this.log = log;
          this.config = config;
-         this.semanticUtility = semanticUtility;
+         this.agentUtility = agentUtility;
          this.common = common;
+         this.aiSearch = aiSearch;
 
          try
          {
@@ -55,7 +54,7 @@ namespace DocumentQuestions.Library
       }
 
 
-      public async Task ProcessDocument(Uri fileUri, string modelId = "prebuilt-layout", string indexName = "")
+      public async Task ProcessDocument(Uri fileUri, string modelId = "prebuilt-layout")
       {
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
@@ -67,10 +66,10 @@ namespace DocumentQuestions.Library
             };
             operation = await docIntelClient.AnalyzeDocumentAsync(Azure.WaitUntil.Completed, opts);
          AnalyzeResult result = operation.Value;
-         await ProcessDocumentResults(result, fileUri.AbsoluteUri, indexName);
+         await ProcessDocumentResults(result, fileUri.AbsoluteUri);
       }
 
-      public async Task ProcessDocument(FileInfo file, string modelId = "prebuilt-layout", string indexName = "")
+      public async Task ProcessDocument(FileInfo file, string modelId = "prebuilt-layout")
       {
          //log.LogInformation($"Processing file {file.FullName} with Document Intelligence Service...");
          Operation<AnalyzeResult> operation;
@@ -87,104 +86,32 @@ namespace DocumentQuestions.Library
          }
          AnalyzeResult result = operation.Value;
 
-         await ProcessDocumentResults(result, file.FullName, indexName);
+         await ProcessDocumentResults(result, file.FullName);
       }
 
-      public async Task ProcessDocumentResults(AnalyzeResult result, string filePathOrUrl, string indexName)
+      public async Task ProcessDocumentResults(AnalyzeResult result, string filePathOrUrl)
       {
-
-         indexName = Common.SafeIndexName(filePathOrUrl, indexName);
-
          if (result != null)
          {
+            var fileName = Common.GetFileNameForBlob(filePathOrUrl);
             string content = result.Content;
-            var contentLines = content.Split(Environment.NewLine).ToList();
+            var contentLines = content.Split("\n").ToList();
            
 
-            log.LogInformation($"Writing document Markdown to bloc...");
-            await common.WriteAnalysisContentToBlob(indexName,result.Content, log);
+            log.LogInformation($"Writing document Markdown to blob...");
+            await common.WriteAnalysisContentToBlob(fileName, result.Content, log);
             log.LogInformation($"Parsing Document Intelligence results...");
-            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, 8191);
+            var chunked = TextChunker.SplitPlainTextParagraphs(contentLines, AiSearch.EmbeddingChunkSize);
             var taskList = new List<Task>();
 
             log.LogInformation($"Saving Document Intelligence results to Azure AI Search Index...");
-            taskList.Add(semanticUtility.StoreMemoryAsync(indexName, Common.BaseFileName(filePathOrUrl), chunked));
-            taskList.Add(semanticUtility.StoreMemoryAsync("general", Common.BaseFileName(filePathOrUrl), chunked));
+            //taskList.Add(aiSearch.StoreDataInIndex(indexName, Common.BaseFileName(filePathOrUrl), chunked));
+            taskList.Add(aiSearch.StoreDataInIndex(AiSearch.IndexName, fileName, chunked));
             Task.WaitAll(taskList.ToArray());
          }
          log.LogInformation("Document Processed and Indexed");
 
       }
-   
-      //private Dictionary<string, string> SplitDocumentIntoPagesAndParagraphs(AnalyzeResult result, string fileName)
-      //{
-      //   var content = "";
-      //   bool contentFound = false;
-      //   var taskList = new List<Task>();
-      //   var docContent = new Dictionary<string, string>();
 
-      //   //Split by page if there is content...
-      //   log.LogInformation("Checking document data...");
-      //   foreach (DocumentPage page in result.Pages)
-      //   {
-
-      //      for (int i = 0; i < page.Lines.Count; i++)
-      //      {
-      //         DocumentLine line = page.Lines[i];
-      //         log.LogDebug($"  Line {i} has content: '{line.Content}'.");
-      //         content += line.Content.ToString();
-      //         contentFound = true;
-      //      }
-
-      //      if (!string.IsNullOrEmpty(content))
-      //      {
-      //         log.LogDebug("content = " + content);
-      //         taskList.Add(common.WriteAnalysisContentToBlob(fileName, page.PageNumber, content, log));
-      //         docContent.Add(GetFileName(fileName, page.PageNumber), content);
-      //      }
-      //      content = "";
-      //   }
-
-      //   //Otherwise, split by collected paragraphs
-      //   content = "";
-      //   if (!contentFound && result.Paragraphs != null)
-      //   {
-      //      var counter = 0;
-      //      foreach (DocumentParagraph paragraph in result.Paragraphs)
-      //      {
-
-      //         if (paragraph != null && !string.IsNullOrWhiteSpace(paragraph.Content))
-      //         {
-      //            if (content.Length + paragraph.Content.Length < 4000)
-      //            {
-      //               content += paragraph.Content + Environment.NewLine;
-      //            }
-      //            else
-      //            {
-      //               taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
-      //               docContent.Add(GetFileName(fileName, counter), content);
-      //               counter++;
-
-      //               content = paragraph.Content + Environment.NewLine;
-      //            }
-      //         }
-
-      //      }
-
-      //      //Add the last paragraph
-      //      taskList.Add(common.WriteAnalysisContentToBlob(fileName, counter, content, log));
-      //      docContent.Add(GetFileName(fileName, counter), content);
-      //   }
-
-      //   return docContent;
-      //}
-
-      private string GetFileName(string name, int counter)
-      {
-         string nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
-         string newName = nameWithoutExtension.Replace(".", "_");
-         newName += $"_{counter.ToString().PadLeft(4, '0')}.json";
-         return newName;
-      }
    }
 }

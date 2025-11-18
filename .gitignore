@@ -270,3 +270,6 @@ __pycache__/
 .azure
 /Properties/launchSettings.json
 
+/migration
+/MIGRATION_SUMMARY.md
+/.github/copilot-instructions.md

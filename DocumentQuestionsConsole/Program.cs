@@ -7,7 +7,6 @@ using DocumentQuestions.Library;
 using Azure.AI.DocumentIntelligence;
 using Azure;
 using Azure.Identity;
-using Microsoft.SemanticKernel;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry;
@@ -55,29 +54,54 @@ namespace DocumentQuestions.Console
                 .AddService("DocumentQuestions.Console");
 
             // Enable model diagnostics with sensitive data.
-            AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiagnosticsSensitive", true);
+            AppContext.SetSwitch("Microsoft.Agents.AI.EnableOTelDiagnosticsSensitive", true);
 
             using var traceProvider = Sdk.CreateTracerProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddSource("Microsoft.SemanticKernel*")
+                .AddSource("Microsoft.Agents.AI*")
                 .AddAzureMonitorTraceExporter(options => options.ConnectionString = connectionString)
                 .Build();
 
             using var meterProvider = Sdk.CreateMeterProviderBuilder()
                 .SetResourceBuilder(resourceBuilder)
-                .AddMeter("Microsoft.SemanticKernel*")
+                .AddMeter("Microsoft.Agents.AI*")
                 .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
                 .Build();
          }
 
          var builder = new HostBuilder()
+             .ConfigureLogging(logging =>
+             {
+                logging.SetMinimumLevel(level);
+                //logging.AddFilter("System", LogLevel.Warning);
+                //logging.AddFilter("Microsoft", LogLevel.Warning);
+                if (!string.IsNullOrWhiteSpace(connectionString))
+                {
+                   logging.AddOpenTelemetry(options =>
+                   {
+                      options.SetResourceBuilder(resourceBuilder);
+                      options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
+                      // Format log messages. This is default to false.
+                      options.IncludeFormattedMessage = true;
+                      options.IncludeScopes = true;
+                   });
+                }
+
+                logging.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
+                logging.AddConsole(options =>
+                {
+                   options.FormatterName = "custom";
+
+                });
+             })
             .ConfigureServices((hostContext, services) =>
             {
                services.AddSingleton<StartArgs>(new StartArgs(args));
-               services.AddSingleton<SemanticUtility>();
+               services.AddSingleton<AgentUtility>();
                services.AddSingleton<DocumentIntelligence>();
                services.AddSingleton<AiSearch>();
-               services.AddSingleton<IFunctionInvocationFilter, SkFunctionInvocationFilter>();
+               services.AddSingleton<LocalToolsLibrary>();
+               services.AddSingleton<LocalToolsUtility>();
                services.AddSingleton(sp =>
                {
                   var config = sp.GetRequiredService<IConfiguration>();
@@ -90,31 +114,7 @@ namespace DocumentQuestions.Console
                services.AddHostedService<Worker>();
                services.AddSingleton<ConsoleFormatter, CustomConsoleFormatter>();
             })
-             .ConfigureLogging(logging =>
-             {
-                logging.SetMinimumLevel(level);
-                logging.AddFilter("System", LogLevel.Warning);
-                logging.AddFilter("Microsoft", LogLevel.Warning);
-                logging.AddFilter("Microsoft.SemanticKernel", LogLevel.Warning);
-                if (!string.IsNullOrWhiteSpace(connectionString))
-                {
-                   logging.AddOpenTelemetry(options =>
-                  {
-                     options.SetResourceBuilder(resourceBuilder);
-                     options.AddAzureMonitorLogExporter(options => options.ConnectionString = connectionString);
-                     // Format log messages. This is default to false.
-                     options.IncludeFormattedMessage = true;
-                     options.IncludeScopes = true;
-                  });
-                }
-
-                logging.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
-                logging.AddConsole(options =>
-                {
-                   options.FormatterName = "custom";
-
-                });
-             })
+            
              
              .ConfigureAppConfiguration((hostContext, appConfiguration) =>
              {
