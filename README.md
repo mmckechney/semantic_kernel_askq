@@ -1,3 +1,8 @@
+**NOTE!! Archiving this Repo**. _
+For an updated version that leverages Microsoft Foundry and the Agent Framework, please go here: https://github.com/mmckechney/DocumentQuestions
+
+---
+
 # Semantic Kernel and Azure OpenAI: Ask Questions on your document
 
 
